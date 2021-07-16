@@ -5,6 +5,7 @@ from collections import Counter
 URL = "https://www.zoomit.ir/hello/man"
 test = ["salam", "hello", "hi", "salam"]
 
+
 def is_url_root(url: str) -> bool:
     result = True
     if "http" in url:
@@ -20,7 +21,6 @@ def is_url_root(url: str) -> bool:
         return result
     else:
         raise Exception(f"{url} Must be a http/https form")
-
 
 
 def url_spliter(url: str, root: bool = False) -> list:
@@ -48,6 +48,16 @@ def list_counter(items: list) -> list:
     _dict = dict(Counter(items))
     result = sorted(_dict.items(), key=lambda x: x[1], reverse=True)
     return result
+
+
+def element_with_key(elements: list, key: str):
+    custom = None
+    if key != None:
+        if key == "text":
+            custom = [el.text for el in elements if el.text.strip() != ""]
+        else:
+            custom = [el[key] for el in elements if el.get(key, "").strip() != ""]
+    return custom or elements
 
 
 # print(url_spliter(URL))

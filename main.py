@@ -1,13 +1,13 @@
 from enum import unique
-import time, json, datetime
-from utils import is_url_root, url_spliter, list_counter
+import time, json, datetime, uuid
+from utils import is_url_root, url_spliter, list_counter, element_with_key
 import crawl_utils
 from text_process_utils import TextSimilarity
 from concurrent.futures import ThreadPoolExecutor
 
 URL = "https://www.zoomg.ir/"
 URL_PAGE = "https://www.zoomit.ir/howto/372640-web-searches-secure-private/"
-URL_PAGE_2 = "https://digiato.com/article/2021/07/14/%d8%a8%d8%b1%d8%b1%d8%b3%db%8c-%d9%84%d9%be%d8%aa%d8%a7%d9%be-%d8%a7%d9%85-%d8%a7%d8%b3-%d8%a2%db%8c-%d9%85%d8%af%d8%b1%d9%86-%db%b1%db%b4-%d9%85%d8%af%d9%84-a10m/"
+URL_WITH_VIDEO = "https://www.zoomg.ir/game-articles/330159-xbox-series-x-games-spec-release-date-buy/"
 
 
 class WebPage:
@@ -26,18 +26,16 @@ class WebPage:
 
         response = crawl_utils.safe_get(url)
         soup = crawl_utils.page_soup(response)
-        links = crawl_utils.all_links_of(soup, root_url=url)
         title = soup.title.string
         title_h1 = soup.find("h1").text.strip() if soup.find("h1") else None
 
         crawl_time_in_seconds = round(time.time() - t1, 3)
 
+        self.id = str(uuid.uuid4()).replace("-", "")
         self.title = title
         self.ready_title = title.split("-")[0].strip()
         self.title_h1 = title_h1
         self.url = url
-        self.links = links
-        self.just_links = [link["href"] for link in self.links]
         self.crawl_time_seconds = crawl_time_in_seconds
         self.is_first_site_page = is_first_site_page
         self.soup = soup
@@ -45,47 +43,69 @@ class WebPage:
         self._children = []
         self.children_crawl_time_seconds = None
 
+    def links(self):
+        links = crawl_utils.all_links_of(self.soup, root_url=self.url)
+        return links
+
+    def just_links(self, limit: int = None):
+        all_links = self.links() if limit is None else self.links()[0:limit]
+        links = [link["href"] for link in all_links]
+        return links
+
     def most_repeated_paths(self, length: int = 5):
         second_url_children = [
-            url_spliter(url)[0] for url in self.just_links if len(url_spliter(url)) > 0
+            url_spliter(url)[0]
+            for url in self.just_links()
+            if len(url_spliter(url)) > 0
         ]
         return list_counter(second_url_children)[:length]
 
-    def get_all_images(self, key: str = None):
+    def all_images(self, key: str = None):
         _all = self.soup.find_all("img")
-        custom = None
-        if key != None:
-            custom = [img[key] for img in _all if img.get(key, "").strip() != ""]
-        return custom or _all
+        return element_with_key(_all, key)
 
-    def get_article_element(self):
+    def all_videos(self, key: str = None):
+        _all = self.soup.find_all("video")
+        return element_with_key(_all, key)
+
+    def article_element(self):
         el = self.soup.find("article")
         # assert el is not None, "This page hasn't any <article> tag"
         return el
 
     def article_content(self):
-        el = self.get_article_element()
+        el = self.article_element()
         text = el.text.strip() if el else None
         return text
 
-    def get_article_image_element(self):
-        all_images = self.get_all_images()
+    def article_main_image(self):
+        all_images = self.all_images()
         ts = TextSimilarity()
         for img in all_images:
             img_alt = img.get("alt", "").strip()
             _title = self.title_h1 or self.ready_title
             is_similar, similarity = ts.is_similar_to(img_alt, _title)
-            self.img_alt_similarity_with_title = similarity * 100
+            self.img_alt_similarity_with_title = round(similarity * 100)
             if img_alt != "" and is_similar:
                 return img
         return None
+
+    def article_images(self, key: str = None):
+        article = self.article_element()
+        _all = article.find_all("img")
+        return element_with_key(_all, key)
+    
+    def article_headlines(self, key: str = None):
+        article = self.article_element()
+        _all = article.find_all("h2")
+        return element_with_key(_all, key)
 
     def save_article_locally(self):
         with open(self.title + ".txt", mode="w", encoding="utf-8") as f:
             f.write(self.article_content())
 
     def is_article_page(self) -> bool:
-        page_article_element = self.get_article_element()
+        page_article_element = self.article_element()
         if page_article_element is None:
             return False
         article_content_length_is_enough = len(page_article_element.text) >= 350
@@ -93,7 +113,7 @@ class WebPage:
 
     def crawl_children(self, multithread: bool = True, limit: int = None):
         t1 = time.time()
-        _links = self.just_links if not limit else self.just_links[0:limit]
+        _links = self.just_links(limit=limit)
         if not multithread:
             self._children = [WebPage(link) for link in _links]
         else:
@@ -111,16 +131,20 @@ class WebPage:
         return self._children
 
     def json(self):
-        main_img = self.get_article_image_element()
+        main_img = self.article_main_image()
         main_img_src = main_img["src"] if main_img else None
         _dict = {
+            "id": self.id,
             "url": self.url,
             "title": self.ready_title,
             "title_h1": self.title_h1,
-            "links_count": len(self.just_links),
+            "links_count": len(self.just_links()),
             "img": [main_img_src] if main_img_src else None,
+            "videos": self.all_videos(key="src"),
             "is_root_page": self.is_first_site_page,
             "is_article_page": self.is_article_page(),
+            "article_headlines": self.article_headlines(key="text"),
+            "article_images": self.article_images(key="src"),
             "crawl_time_seconds": self.crawl_time_seconds,
             "crawled_date": self.crawled_date,
             "img_alt_similarity_with_title": self.img_alt_similarity_with_title
@@ -129,9 +153,5 @@ class WebPage:
         return json.dumps(_dict, indent=4, default=str)
 
 
-p = WebPage(url=URL)
-for page in p.children(multithread=True, limit=5):
-    print(page.json())
-
-print("-------\n")
-print(p.children_crawl_time_seconds)
+p = WebPage(url=URL_WITH_VIDEO)
+print(p.json())
