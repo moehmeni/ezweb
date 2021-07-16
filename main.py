@@ -1,5 +1,5 @@
 from enum import unique
-import time, json
+import time, json , datetime
 from utils import is_url_root, url_spliter, list_counter
 import crawl_utils
 from text_process_utils import TextSimilarity
@@ -35,6 +35,7 @@ class WebPage:
         self.crawl_time_seconds = crawl_time_in_seconds
         self.is_first_site_page = is_first_site_page
         self.soup = soup
+        self.crawled_date = datetime.datetime.now()
 
     def most_repeated_paths(self, length: int = 5):
         second_url_children = [
@@ -93,4 +94,4 @@ class WebPage:
 
 
 p = WebPage(url=URL)
-print(p.is_article_page())
+print(p.crawled_date)
