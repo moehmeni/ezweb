@@ -100,7 +100,7 @@ class WebPage:
             self.img_alt_similarity_with_title = round(similarity * 100)
             if img_alt != "" and is_similar:
                 return img
-        return None
+        return self.article_images()[0] or None
 
     def article_images(self, key: str = None):
         article = self.article_element()
