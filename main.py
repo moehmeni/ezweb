@@ -6,7 +6,7 @@ from text_process_utils import TextSimilarity
 from concurrent.futures import ThreadPoolExecutor
 
 URL = "https://www.zoomg.ir/"
-URL_PAGE = "https://www.isna.ir/news/1400042618704/%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D8%BA%DB%8C%D8%B1%D8%A7%D8%B3%D8%AA%D9%86%D8%A7%D8%AF%DB%8C-%D8%B3%D8%A7%DB%8C%D9%86%D8%B3-%D8%A7%D8%B2-%DB%8C%DA%A9-%D8%B7%D8%B1%D8%AD-%D9%85%D9%84%DB%8C-%D8%AF%D9%81%D8%A7%D8%B9-%D8%A7%D8%AE%D8%AA%D8%B1%D9%81%DB%8C%D8%B2%DB%8C%DA%A9%D8%AF%D8%A7%D9%86-%D9%87%D8%A7%DB%8C"
+URL_PAGE = "https://vigiato.net/p/197937"
 URL_WITH_VIDEO = "https://www.zoomg.ir/game-articles/330159-xbox-series-x-games-spec-release-date-buy/"
 
 
@@ -27,7 +27,11 @@ class WebPage:
         response = crawl_utils.safe_get(url)
         soup = crawl_utils.page_soup(response)
         title = soup.title.string
-        meta_tag_description = soup.find("meta" , {"name":"description"})["content"].strip() if soup.find("meta" , {"name":"description"}) else None
+        meta_tag_description = (
+            soup.find("meta", {"name": "description"})["content"].strip()
+            if soup.find("meta", {"name": "description"})
+            else None
+        )
         crawl_time_in_seconds = round(time.time() - t1, 3)
 
         self.id = str(uuid.uuid4()).replace("-", "")
@@ -82,34 +86,40 @@ class WebPage:
         ts = TextSimilarity()
         for h1 in all_h1:
             h1_text = h1.text.strip() if h1 and h1.text else None
-            if h1_text is not None :
+            if h1_text is not None:
                 _title = self.ready_title
                 is_similar, similarity = ts.is_similar_to(h1_text, _title)
                 self.h1_similarity_with_title = round(similarity * 100)
                 if is_similar:
                     return h1
         return None
-    
+
     def article_main_image(self):
+        meta_og_img = self.soup.find("meta", {"property": "og:image"})
+        if meta_og_img is not None:
+            return meta_og_img
+        
         all_images = self.all_images()
         ts = TextSimilarity()
         for img in all_images:
             img_alt = img.get("alt", "").strip()
-            _title = self.main_h1().text or self.ready_title
+            _title = self.main_h1().text if self.main_h1() else None or self.ready_title
             is_similar, similarity = ts.is_similar_to(img_alt, _title)
             self.img_alt_similarity_with_title = round(similarity * 100)
             if img_alt != "" and is_similar:
                 return img
-            
-        meta_og_img = self.soup.find("meta" , {"property" : "og:image"})
-        meta_og_img_src = meta_og_img.get("content" , None) if meta_og_img else None
-        return meta_og_img_src or self.article_images()[0] if len(self.article_images()) > 0 else None
+
+        return self.article_images()[0] if len(self.article_images()) > 0 else None
+
+    def main_img_src(self):
+        img = self.article_main_image()
+        return img.get("src", img.get("content", ""))
 
     def article_images(self, key: str = None):
         article = self.article_element()
         _all = article.find_all("img")
         return element_with_key(_all, key)
-    
+
     def article_headlines(self, key: str = None):
         article = self.article_element()
         _all = article.find_all("h2")
@@ -163,11 +173,11 @@ class WebPage:
             "crawl_time_seconds": self.crawl_time_seconds,
             "crawled_date": self.crawled_date,
             "img_alt_similarity_with_title": self.img_alt_similarity_with_title,
-            "meta_tag_desc" : self.meta_tag_description
+            "meta_tag_desc": self.meta_tag_description
             # "article_content": self.article_content(),
         }
         return json.dumps(_dict, indent=4, default=str)
 
 
 p = WebPage(url=URL_PAGE)
-print(p.main_h1())
+print(p.main_img_src())
