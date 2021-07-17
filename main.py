@@ -100,7 +100,10 @@ class WebPage:
             self.img_alt_similarity_with_title = round(similarity * 100)
             if img_alt != "" and is_similar:
                 return img
-        return self.article_images()[0] if len(self.article_images()) > 0 else None
+            
+        meta_og_img = self.soup.find("meta" , {"property" : "og:image"})
+        meta_og_img_src = meta_og_img.get("content" , None) if meta_og_img else None
+        return meta_og_img_src or self.article_images()[0] if len(self.article_images()) > 0 else None
 
     def article_images(self, key: str = None):
         article = self.article_element()
