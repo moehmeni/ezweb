@@ -135,6 +135,18 @@ class WebPage:
             return False
         article_content_length_is_enough = len(page_article_element.text) >= 350
         return article_content_length_is_enough
+    
+    def page_root_name_fa(self):
+        meta_og_site_name = self.soup.find("meta", {"property": "og:site_name"})
+        if (meta_og_site_name is not None) and (
+            meta_og_site_name.get("content", None) is not None
+        ):
+            return meta_og_site_name["content"]
+
+        title = self.title
+        splited = title.split("-") if "-" in title else title.split("|") if "|" in title else title.split(":")  if ":" in title else title.split("،")
+        name = splited[1] if len(splited) >= 2 else None
+        return name
 
     def crawl_children(self, multithread: bool = True, limit: int = None):
         t1 = time.time()
