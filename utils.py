@@ -1,6 +1,7 @@
-from bs4 import PageElement
 from collections import Counter
 
+from bs4.element import Tag
+from statistics import mean
 
 URL = "https://www.zoomit.ir/hello/man"
 test = ["salam", "hello", "hi", "salam"]
@@ -37,7 +38,8 @@ def url_spliter(url: str, root: bool = False) -> list:
     return result
 
 
-def link_of(a_tag: PageElement, root_url: str) -> str:
+def link_of(a_tag: Tag, root_url: str) -> str:
+    if a_tag is None : return
     href = a_tag["href"]
     if "http" in href:
         return href
@@ -59,5 +61,7 @@ def element_with_key(elements: list, key: str):
             custom = [el[key] for el in elements if el.get(key, "").strip() != ""]
     return custom or elements
 
-
-# print(url_spliter(URL))
+def topics_ok(topic_names : list) -> bool :
+    lens = [len(n) for n in topic_names]
+    avg_len = mean(lens)
+    return avg_len <= 20

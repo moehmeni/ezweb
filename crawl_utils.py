@@ -4,14 +4,17 @@ from exceptions import RequestBadStatusCode
 from utils import link_of
 
 def safe_get(url: str) -> requests.Response:
-    response = requests.get(url)
+    print(f"Requesting {url}\n")
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    response = requests.get(url , headers=headers)
     if response.status_code != 200:
         raise RequestBadStatusCode(url, response)
     return response
 
 
-def page_soup(response: requests.Response) -> BeautifulSoup:
-    soup = BeautifulSoup(response.text, features="html.parser")
+def page_soup(url: str) -> BeautifulSoup:
+    response = safe_get(url)
+    soup = BeautifulSoup(response.text, features="lxml")
     return soup
 
 
