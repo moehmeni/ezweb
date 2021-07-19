@@ -1,12 +1,12 @@
 import time, json, datetime, uuid
 
 from bs4.element import Tag
-from utils import is_url_root, link_of, url_spliter, list_counter, element_with_key , topics_ok
+from utils import is_url_root, link_of, url_spliter, list_counter, element_with_key , topics_ok , tag_text ,tag_text_ok
 import crawl_utils
 from text_process_utils import TextSimilarity
 from concurrent.futures import ThreadPoolExecutor
 import re
-from hazm import *
+# from hazm import *
 
 class PageCard:
     def __init__(self, card_tag: Tag, root_url: str) -> None:
@@ -284,18 +284,37 @@ class WebPage:
         print(detect_time_seconds)
         allowed = ['N', 'Ne' , 'AJ']
         return [t[0] for t in tags if t[1] in allowed] , detect_time_seconds
-
+    
+    def important_links(self , key :str):
+        r = self.soup.body
+        heads = r.find_all("h2") + r.find_all("h3")
+        containers = heads if len(heads) > 9 else r.select('*[class*="item"]')
+        print(containers[0])
+        
+        def ok(c:Tag):
+            el_itself= c if c.name == 'a' and tag_text_ok(c) else None
+            tag = c.find('a' , href=True , text=True) or el_itself
+            if tag is None : return False , None
+            text = tag_text(tag)
+            condition = len(text) >=15 
+            return condition , tag
+        
+        tags = [ok(c)[1] for c in containers if ok(c)[0] ]
+        # print(a_tags_with_h2_parent)
+        return element_with_key(tags , key)
 
 URL_zoomit = "https://www.zoomit.ir/"
 URL_shahr = "https://www.shahrsakhtafzar.com/fa/"
 URL_digiato = "https://digiato.com/"
 URL_vigiato = "https://vigiato.net/"
+URL_dgmag = "https://www.digikala.com/mag/"
 page_zoomit = "https://www.zoomit.ir/tech-iran/372798-digikala-customers-corona-99/"
 page_digiato = "https://digiato.com/article/2021/07/17/%d9%85%d9%85%d9%86%d9%88%d8%b9%db%8c%d8%aa-%d9%88%d8%a7%d8%b1%d8%af%d8%a7%d8%aa-%da%af%d9%88%d8%b4%db%8c%e2%80%8c%d9%87%d8%a7%db%8c-%d8%b4%db%8c%d8%a7%d8%a6%d9%88%d9%85%db%8c/"
 page_shahr = "https://www.shahrsakhtafzar.com/fa/price-list/10386-powerbank-price-list"
 page_dgmag = "https://www.digikala.com/mag/top-ghibli-studio-memorable-characters/"
 URL_WITH_VIDEO = "https://www.zoomg.ir/game-articles/330159-xbox-series-x-games-spec-release-date-buy/"
 
-p = WebPage(url=page_zoomit)
-r = p.article.topics()
-print(r)
+p = WebPage(url=URL_vigiato)
+with open("to_crawl.txt" , "w" , encoding="utf-8") as f:
+    for t in p.important_links("text") :
+        f.write(t+'\n')

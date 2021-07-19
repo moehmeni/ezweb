@@ -56,7 +56,7 @@ def element_with_key(elements: list, key: str):
     custom = None
     if key != None:
         if key == "text":
-            custom = [el.text for el in elements if el.text.strip() != ""]
+            custom = set([tag_text(el) for el in elements if tag_text_ok(el)])
         else:
             custom = [el[key] for el in elements if el.get(key, "").strip() != ""]
     return custom or elements
@@ -65,3 +65,14 @@ def topics_ok(topic_names : list) -> bool :
     lens = [len(n) for n in topic_names]
     avg_len = mean(lens)
     return avg_len <= 20
+
+
+def tag_text(t:Tag):
+    text = (t.text or t.get("title" , None)).strip().replace("\n" , "")
+    text = " ".join(text.split())
+    return text
+    
+def tag_text_ok(t : Tag):
+    text= tag_text(t)
+    ok = text and text != ''
+    return ok
