@@ -1,12 +1,23 @@
 import time, json, datetime, uuid
 
 from bs4.element import Tag
-from utils import is_url_root, link_of, url_spliter, list_counter, element_with_key , topics_ok , tag_text ,tag_text_ok
+from utils import (
+    is_url_root,
+    link_of,
+    url_spliter,
+    list_counter,
+    element_with_key,
+    topics_ok,
+    tag_text,
+    tag_text_ok,
+)
 import crawl_utils
 from text_process_utils import TextSimilarity
 from concurrent.futures import ThreadPoolExecutor
 import re
+
 # from hazm import *
+
 
 class PageCard:
     def __init__(self, card_tag: Tag, root_url: str) -> None:
@@ -27,9 +38,10 @@ class PageCard:
     def topic_link_tag(self):
         all_links = self.all_texted_links()
         all_except_main = [a for a in all_links if a.text != self.main_link_tag().text]
-        if len(all_except_main) < 1 : return None
+        if len(all_except_main) < 1:
+            return None
         return all_except_main[0]
-    
+
     def topic_link_href(self):
         return link_of(self.topic_link_tag(), self.url)
 
@@ -42,12 +54,13 @@ class PageCard:
             else "No title"
         )
 
+
 class ArticleTag:
-    def __init__(self , soup) -> None:
+    def __init__(self, soup) -> None:
         self.soup = soup
         # most_h2_el = sorted(soup.body.find_all('div') , key=lambda x : len(x.contents) ,reverse=True)[0]
         # print(most_h2_el.get('class' , most_h2_el.get('id' , most_h2_el)))
-        self.tag = soup.find('article')
+        self.tag = soup.find("article")
 
     def text(self) -> str:
         text = self.tag.text.strip() if self.tag else None
@@ -62,38 +75,43 @@ class ArticleTag:
         return element_with_key(_all, key)
 
     def a_tags(self):
-        tags = [t for t in self.tag.find_all('a' , href=True) if '/' in t['href']]
+        tags = [t for t in self.tag.find_all("a", href=True) if "/" in t["href"]]
         return tags
 
     def topics(self):
         nav = self.tag.find("ul") or self.soup.body.select('*[class*="breadcrumb"]')[0]
         print(nav)
-        def name(n:str)->str:
+
+        def name(n: str) -> str:
             n = n.split(" ")
-            bads = ['اخبار']
+            bads = ["اخبار"]
             ok = [w for w in n if w not in bads]
             return " ".join(ok)
-        tags = [name(t.text) for t in nav.find_all('a' , href=True) if '/' in t['href']]
-        if topics_ok(tags) : return tags
+
+        tags = [name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]]
+        if topics_ok(tags):
+            return tags
         else:
             # That was not a topics ul (go to topics_ok()) let's try els with breadcrumb contained class
             nav = self.soup.body.select('*[class*="breadcrumb"]')[0]
-            tags = [name(t.text) for t in nav.find_all('a' , href=True) if '/' in t['href']]
-            if topics_ok(tags) : return tags
-            
+            tags = [
+                name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]
+            ]
+            if topics_ok(tags):
+                return tags
 
-    def save_locally(self , path : str = None):
+    def save_locally(self, path: str = None):
         _path = path or (self.title + ".txt")
         with open(_path, mode="w", encoding="utf-8") as f:
             f.write(self.article_content())
-        print("Article saved in "+ _path)
+        print("Article saved in " + _path)
 
     def ok(self) -> bool:
         if self.tag is None:
             return False
         article_content_length_is_enough = len(self.text()) >= 350
         return article_content_length_is_enough
-    
+
 
 class WebPage:
     def __init__(
@@ -109,7 +127,8 @@ class WebPage:
 
         t1 = time.time()
         soup = crawl_utils.page_soup(url)
-        if not is_first_site_page : self.article = ArticleTag(soup)
+        if not is_first_site_page:
+            self.article = ArticleTag(soup)
         title = soup.title.string
         meta_tag_description = (
             soup.find("meta", {"name": "description"})["content"].strip()
@@ -139,7 +158,7 @@ class WebPage:
         all_links = self.links() if limit is None else self.links()[0:limit]
         links = [link["href"] for link in all_links]
         return links
-    
+
     def main_image(self) -> Tag:
         meta_og_img = self.soup.find("meta", {"property": "og:image"})
         if meta_og_img is not None:
@@ -157,7 +176,6 @@ class WebPage:
 
         return self.article.images()[0] if len(self.article.images()) > 0 else None
 
-
     def most_repeated_paths(self, length: int = 5):
         second_url_children = [
             url_spliter(url)[0]
@@ -173,11 +191,11 @@ class WebPage:
     def all_videos(self, key: str = None):
         _all = self.soup.find_all("video")
         return element_with_key(_all, key)
- 
+
     def main_img_src(self):
         img = self.main_image()
         return img.get("src", img.get("content", ""))
-    
+
     def main_h1(self) -> Tag:
         all_h1 = self.soup.find_all("h1")
         ts = TextSimilarity()
@@ -190,7 +208,7 @@ class WebPage:
                 if is_similar:
                     return h1
         return None
-    
+
     def page_root_name(self):
         meta_og_site_name = self.soup.find("meta", {"property": "og:site_name"})
         if (meta_og_site_name is not None) and (
@@ -235,25 +253,6 @@ class WebPage:
 
         return set(result)
 
-    def crawl_children(self, multithread: bool = True, limit: int = None):
-        t1 = time.time()
-        _links = self.just_links(limit=limit)
-        if not multithread:
-            self._children = [WebPage(link) for link in _links]
-        else:
-
-            def maper(url: str):
-                page = WebPage(url)
-                self._children.append(page)
-
-            with ThreadPoolExecutor() as executor:
-                executor.map(maper, _links)
-        self.children_crawl_time_seconds = round(time.time() - t1, 3)
-
-    def children(self, multithread: bool = True, limit: int = None) -> list:
-        self.crawl_children(multithread=multithread, limit=limit)
-        return self._children
-
     def json(self):
         main_img = self.main_image()
         main_img_src = main_img["src"] if main_img else None
@@ -274,47 +273,56 @@ class WebPage:
         }
         return json.dumps(_dict, indent=4, default=str)
 
-    def title_keywords(self):
-        t = time.time()
-        title = self.main_h1().text
-        tagger = POSTagger(model='resources/postagger.model')
-        tags = tagger.tag(word_tokenize(title))
-        print(tags)
-        detect_time_seconds = round(time.time() - t , 3)
-        print(detect_time_seconds)
-        allowed = ['N', 'Ne' , 'AJ']
-        return [t[0] for t in tags if t[1] in allowed] , detect_time_seconds
-    
-    def important_links(self , key :str):
+    # def title_keywords(self):
+    #     t = time.time()
+    #     title = self.main_h1().text
+    #     tagger = POSTagger(model='resources/postagger.model')
+    #     tags = tagger.tag(word_tokenize(title))
+    #     print(tags)
+    #     detect_time_seconds = round(time.time() - t , 3)
+    #     print(detect_time_seconds)
+    #     allowed = ['N', 'Ne' , 'AJ']
+    #     return [t[0] for t in tags if t[1] in allowed] , detect_time_seconds
+
+    def important_links(self, key: str):
         r = self.soup.body
         heads = r.find_all("h2") + r.find_all("h3")
         containers = heads if len(heads) > 9 else r.select('*[class*="item"]')
         print(containers[0])
-        
-        def ok(c:Tag):
-            el_itself= c if c.name == 'a' and tag_text_ok(c) else None
-            tag = c.find('a' , href=True , text=True) or el_itself
-            if tag is None : return False , None
+
+        def ok(c: Tag):
+            # Maybe the el itself is an "a" tag that coontains data and it is a card itself
+            el_itself = c if c.name == "a" and tag_text_ok(c) else None
+            # Check for container "a" tags or as I said in the previous comment it is a container itself
+            tag = c.find("a", href=True, text=True) or el_itself
+
+            if tag is None:
+                return False, None
+
             text = tag_text(tag)
-            condition = len(text) >=15 
-            return condition , tag
-        
-        tags = [ok(c)[1] for c in containers if ok(c)[0] ]
+            condition = len(text) >= 15
+
+            return condition, tag
+
+        tags = [ok(c)[1] for c in containers if ok(c)[0]]
         # print(a_tags_with_h2_parent)
-        return element_with_key(tags , key)
+        return element_with_key(tags, key)
 
-URL_zoomit = "https://www.zoomit.ir/"
-URL_shahr = "https://www.shahrsakhtafzar.com/fa/"
-URL_digiato = "https://digiato.com/"
-URL_vigiato = "https://vigiato.net/"
-URL_dgmag = "https://www.digikala.com/mag/"
-page_zoomit = "https://www.zoomit.ir/tech-iran/372798-digikala-customers-corona-99/"
-page_digiato = "https://digiato.com/article/2021/07/17/%d9%85%d9%85%d9%86%d9%88%d8%b9%db%8c%d8%aa-%d9%88%d8%a7%d8%b1%d8%af%d8%a7%d8%aa-%da%af%d9%88%d8%b4%db%8c%e2%80%8c%d9%87%d8%a7%db%8c-%d8%b4%db%8c%d8%a7%d8%a6%d9%88%d9%85%db%8c/"
-page_shahr = "https://www.shahrsakhtafzar.com/fa/price-list/10386-powerbank-price-list"
-page_dgmag = "https://www.digikala.com/mag/top-ghibli-studio-memorable-characters/"
-URL_WITH_VIDEO = "https://www.zoomg.ir/game-articles/330159-xbox-series-x-games-spec-release-date-buy/"
+    def children(self, multithread: bool = True, limit: int = None) -> list:
+        t1 = time.time()
+        links = self.important_links()
+        if not links : return None
+        container = []
+        if not multithread:
+            container = [WebPage(link) for link in links]
+        else:
 
-p = WebPage(url=URL_vigiato)
-with open("to_crawl.txt" , "w" , encoding="utf-8") as f:
-    for t in p.important_links("text") :
-        f.write(t+'\n')
+            def maper(url: str):
+                page = WebPage(url)
+                container.append(page)
+
+            with ThreadPoolExecutor() as executor:
+                executor.map(maper, links)
+                
+        self.children_crawl_time_seconds = round(time.time() - t1, 3)
+        return container
