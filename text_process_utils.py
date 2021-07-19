@@ -1,5 +1,7 @@
+from crawl_utils import page_soup
 import math, re
 from collections import Counter
+
 
 
 class TextSimilarity:
@@ -33,3 +35,30 @@ class TextSimilarity:
         percentage /= 100
         similarity = self.similarity_of(text1, text2)
         return similarity >= percentage, similarity
+
+class AbadisWord:
+    _about_url = "https://abadis.ir/?lntype=fatoen,dehkhoda,fatofa,moeen,amid,name,wiki,wikiislamic&word={word}&from=ac"
+    _similars_url = "https://abadis.ir/AjaxCommand.aspx?Act=GetWords&Word={word}"
+
+    def __init__(self , word : str) -> None:
+        self.word = word
+
+    def about(self):
+        url = self._about_url.format(word=self.word)
+        soup = page_soup(url)
+        wiki_container = soup.find('div' , id='Wiki')
+        if wiki_container is not None and wiki_container.text : return wiki_container.text
+        user_comments = soup.find_all('div','CommentText')
+        if len(user_comments) > 0 : return '،'.join([c.text for c in user_comments if c.text])
+        return None
+
+    def similars(self):
+        url = self._similars_url.format(word=self.word)
+        result = [AbadisWord(span.text) for span in page_soup(url).find_all('span') if span.text and span.text != self.word]
+        return result if len(result) > 0 else None
+
+    def __str__(self) -> str:
+        return self.word
+
+    def __repr__(self):
+        return self.__str__()
