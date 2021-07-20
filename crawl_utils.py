@@ -1,7 +1,8 @@
 import requests
-from bs4 import BeautifulSoup
-from exceptions import RequestBadStatusCode
-from utils import link_of
+from bs4 import BeautifulSoup, FeatureNotFound
+
+from web_crawler.exceptions import RequestBadStatusCode
+from web_crawler.utils import link_of
 
 def safe_get(url: str) -> requests.Response:
     print(f"Requesting {url}\n")
@@ -14,8 +15,12 @@ def safe_get(url: str) -> requests.Response:
 
 def page_soup(url: str) -> BeautifulSoup:
     response = safe_get(url)
-    soup = BeautifulSoup(response.text, features="lxml")
-    return soup
+    try :
+        soup = BeautifulSoup(response.text, features="lxml")
+        return soup
+    except FeatureNotFound as e :
+        soup = BeautifulSoup(response.text, features="html.parser")
+        return soup
 
 
 def all_links_of(soup: BeautifulSoup, root_url: str, mode: bool = "dict") -> list:
