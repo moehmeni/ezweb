@@ -1,4 +1,4 @@
-from crawl_utils import page_soup
+from web_crawler.crawl_utils import page_soup
 import math, re
 from collections import Counter
 

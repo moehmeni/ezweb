@@ -1,20 +1,12 @@
+from os import write
 import time, json, datetime, uuid
-
 from bs4.element import Tag
-from utils import (
-    is_url_root,
-    link_of,
-    url_spliter,
-    list_counter,
-    element_with_key,
-    topics_ok,
-    tag_text,
-    tag_text_ok,
-)
-import crawl_utils
-from text_process_utils import TextSimilarity
 from concurrent.futures import ThreadPoolExecutor
 import re
+
+from web_crawler.utils import *
+from web_crawler import crawl_utils
+from web_crawler.text_process_utils import TextSimilarity
 
 # from hazm import *
 
@@ -57,6 +49,7 @@ class PageCard:
 
 class ArticleTag:
     def __init__(self, soup) -> None:
+        self.root_name = page_name(soup)
         self.soup = soup
         # most_h2_el = sorted(soup.body.find_all('div') , key=lambda x : len(x.contents) ,reverse=True)[0]
         # print(most_h2_el.get('class' , most_h2_el.get('id' , most_h2_el)))
@@ -79,8 +72,12 @@ class ArticleTag:
         return tags
 
     def topics(self):
-        nav = self.tag.find("ul") or self.soup.body.select('*[class*="breadcrumb"]')[0]
-        print(nav)
+        if not self.tag:
+            return
+        breadcrump_els = self.soup.body.select(
+            '*[class*="breadcrumb"]'
+        ) or self.soup.body.select('*[id*="breadcrumb"]')
+        nav = self.tag.find("ul") or (breadcrump_els[0] if breadcrump_els else None)
 
         def name(n: str) -> str:
             n = n.split(" ")
@@ -88,17 +85,28 @@ class ArticleTag:
             ok = [w for w in n if w not in bads]
             return " ".join(ok)
 
-        tags = [name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]]
+        def ok_tags(tags: list):
+            return [t for t in tags if self.root_name and self.root_name not in t]
+
+        tags = []
+        if nav:
+            tags = [
+                name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]
+            ]
+
         if topics_ok(tags):
-            return tags
+            return ok_tags(tags)
+
         else:
             # That was not a topics ul (go to topics_ok()) let's try els with breadcrumb contained class
-            nav = self.soup.body.select('*[class*="breadcrumb"]')[0]
+            if not breadcrump_els:
+                return
+            nav = breadcrump_els[0]
             tags = [
                 name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]
             ]
             if topics_ok(tags):
-                return tags
+                return ok_tags(tags)
 
     def save_locally(self, path: str = None):
         _path = path or (self.title + ".txt")
@@ -140,6 +148,7 @@ class WebPage:
         self.id = str(uuid.uuid4()).replace("-", "")
         self.topics = topics
         self.title = title
+        self.root_name = page_name(soup)
         self.meta_tag_description = meta_tag_description
         self.ready_title = title.split("-")[0].strip()
         self.url = url
@@ -197,7 +206,10 @@ class WebPage:
         return img.get("src", img.get("content", ""))
 
     def main_h1(self) -> Tag:
-        all_h1 = self.soup.find_all("h1")
+        all_h1 = self.soup.body.find_all("h1")
+        if not all_h1:
+            all_h1 = self.soup.body.find_all("h2")
+
         ts = TextSimilarity()
         for h1 in all_h1:
             h1_text = h1.text.strip() if h1 and h1.text else None
@@ -207,29 +219,10 @@ class WebPage:
                 self.h1_similarity_with_title = round(similarity * 100)
                 if is_similar:
                     return h1
-        return None
 
-    def page_root_name(self):
-        meta_og_site_name = self.soup.find("meta", {"property": "og:site_name"})
-        if (meta_og_site_name is not None) and (
-            meta_og_site_name.get("content", None) is not None
-        ):
-            return meta_og_site_name["content"]
+        return all_h1[0] or self.ready_title
 
-        title = self.title
-        splited = (
-            title.split("-")
-            if "-" in title
-            else title.split("|")
-            if "|" in title
-            else title.split(":")
-            if ":" in title
-            else title.split("،")
-        )
-        name = splited[1] if len(splited) >= 2 else None
-        return name
-
-    def page_keywords(self):
+    def keywords(self):
         all_links = self.soup.find_all("a", href=True)
         max_limit = 15
 
@@ -310,8 +303,9 @@ class WebPage:
 
     def children(self, multithread: bool = True, limit: int = None) -> list:
         t1 = time.time()
-        links = self.important_links()
-        if not links : return None
+        links = self.important_links("href")
+        if not links:
+            return None
         container = []
         if not multithread:
             container = [WebPage(link) for link in links]
@@ -323,6 +317,20 @@ class WebPage:
 
             with ThreadPoolExecutor() as executor:
                 executor.map(maper, links)
-                
+
         self.children_crawl_time_seconds = round(time.time() - t1, 3)
         return container
+
+    def save_full_json(self):
+        children = self.children()
+        dicts = []
+        for p in children:
+            d = {
+                "name": p.main_h1().text if p.main_h1() else None,
+                "url": p.url,
+                "topics": p.article.topics(),
+            }
+            dicts.append(d)
+        with open("test.json", "w", encoding="utf-8") as f:
+            f.write(json.dumps(dicts, indent=4, ensure_ascii=False))
+        print("saved")
