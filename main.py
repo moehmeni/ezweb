@@ -1,4 +1,3 @@
-from os import write
 import time, json, datetime, uuid
 from bs4.element import Tag
 from concurrent.futures import ThreadPoolExecutor
@@ -60,11 +59,11 @@ class ArticleTag:
         return text
 
     def images(self, key: str = None):
-        _all = self.tag.find_all("img")
+        _all = self.tag.find_all("img") if self.tag else None
         return element_with_key(_all, key)
 
     def headlines(self, key: str = None):
-        _all = self.tag.find_all("h2")
+        _all = self.tag.find_all("h2") if self.tag else None
         return element_with_key(_all, key)
 
     def a_tags(self):
@@ -72,21 +71,32 @@ class ArticleTag:
         return tags
 
     def topics(self):
-        if not self.tag:
-            return
-        breadcrump_els = self.soup.body.select(
-            '*[class*="breadcrumb"]'
-        ) or self.soup.body.select('*[id*="breadcrumb"]')
-        nav = self.tag.find("ul") or (breadcrump_els[0] if breadcrump_els else None)
+        # print("topcis called")
+        # if not self.tag:
+        #     print("No article tag")
+        #     return
+
+        breadcrump_els = (
+            self.soup.body.select('*[class*="breadcrumb"]')
+            or self.soup.body.select('*[id*="breadcrumb"]')
+            or self.soup.body.select('div[class*="cat"]')
+            or self.soup.body.select('div[class*="tag"]')
+        )
+        first_ul = self.tag.find("ul") if self.tag else None
+        nav = (breadcrump_els[0] if breadcrump_els else None) or first_ul
+        print(nav)
 
         def name(n: str) -> str:
-            n = n.split(" ")
-            bads = ["اخبار"]
-            ok = [w for w in n if w not in bads]
-            return " ".join(ok)
+            return n.strip().replace("\n" , "")
 
         def ok_tags(tags: list):
-            return [t for t in tags if self.root_name and self.root_name not in t]
+            def ok(t : str):
+                t = t.strip().replace("\n" , "")
+                bads = "خانه صفحه اصلی"
+                one = self.root_name not in t
+                two = t not in bads
+                return one and two
+            return [tag_name for tag_name in tags if ok(tag_name)]
 
         tags = []
         if nav:
@@ -94,19 +104,18 @@ class ArticleTag:
                 name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]
             ]
 
-        if topics_ok(tags):
-            return ok_tags(tags)
-
         else:
-            # That was not a topics ul (go to topics_ok()) let's try els with breadcrumb contained class
+            # That was not a topics ul (go to topics_ok()) let's try els with breadcrumb contained class and id
             if not breadcrump_els:
                 return
             nav = breadcrump_els[0]
             tags = [
                 name(t.text) for t in nav.find_all("a", href=True) if "/" in t["href"]
             ]
-            if topics_ok(tags):
-                return ok_tags(tags)
+
+        if topics_ok(tags):
+            result = ok_tags(tags)
+            return result
 
     def save_locally(self, path: str = None):
         _path = path or (self.title + ".txt")
@@ -135,8 +144,7 @@ class WebPage:
 
         t1 = time.time()
         soup = crawl_utils.page_soup(url)
-        if not is_first_site_page:
-            self.article = ArticleTag(soup)
+        self.article = ArticleTag(soup) if not is_first_site_page else None
         title = soup.title.string
         meta_tag_description = (
             soup.find("meta", {"name": "description"})["content"].strip()
@@ -183,7 +191,9 @@ class WebPage:
             if img_alt != "" and is_similar:
                 return img
 
-        return self.article.images()[0] if len(self.article.images()) > 0 else None
+        article_images = self.article.images() if self.article else None
+        first_article_image = article_images[0] if article_images else None
+        return first_article_image
 
     def most_repeated_paths(self, length: int = 5):
         second_url_children = [
@@ -203,7 +213,7 @@ class WebPage:
 
     def main_img_src(self):
         img = self.main_image()
-        return img.get("src", img.get("content", ""))
+        return img.get("src", img.get("content", "")) if img else None
 
     def main_h1(self) -> Tag:
         all_h1 = self.soup.body.find_all("h1")
@@ -277,17 +287,32 @@ class WebPage:
     #     allowed = ['N', 'Ne' , 'AJ']
     #     return [t[0] for t in tags if t[1] in allowed] , detect_time_seconds
 
-    def important_links(self, key: str):
+    def important_links_tags(self, key: str = None):
         r = self.soup.body
-        heads = r.find_all("h2") + r.find_all("h3")
-        containers = heads if len(heads) > 9 else r.select('*[class*="item"]')
-        print(containers[0])
+        heads = (
+            r.find_all("h2")
+            + r.find_all("h3")
+            + [a for a in r.find_all("a") if (a.find("h2") or a.find("h3"))]
+        )
 
-        def ok(c: Tag):
+        def heads_generator(heads: list):
+            # heads = [h for h in heads if h.find("a") or h.parent.name == "a" or h.name == "a"]
+            return len(heads) > 9, heads
+
+        heads_ok, heads = heads_generator(heads)
+        tags = (
+            heads
+            if heads_ok
+            else (r.select('*[class*="item"]') + r.select('div[class*="post"]'))
+        )
+        # print(containers[0])
+        print(f"{str(len(tags))} Containers found")
+
+        def link_of_tag(t: Tag):
             # Maybe the el itself is an "a" tag that coontains data and it is a card itself
-            el_itself = c if c.name == "a" and tag_text_ok(c) else None
+            el_itself = t if t.name == "a" and tag_text_ok(t) else None
             # Check for container "a" tags or as I said in the previous comment it is a container itself
-            tag = c.find("a", href=True, text=True) or el_itself
+            tag = t.find("a", href=True, text=True) or el_itself
 
             if tag is None:
                 return False, None
@@ -295,17 +320,29 @@ class WebPage:
             text = tag_text(tag)
             condition = len(text) >= 15
 
+            print(tag)
+
             return condition, tag
 
-        tags = [ok(c)[1] for c in containers if ok(c)[0]]
+        tags = [link_of_tag(t)[1] for t in tags if link_of_tag(t)[0]]
         # print(a_tags_with_h2_parent)
-        return element_with_key(tags, key)
+        result = element_with_key(tags, key)
+        print(f"{str(len(result))} Link detected")
+        return result
+
+    def important_links_href(self):
+        return [link_of(l, self.url) for l in self.important_links_tags()]
 
     def children(self, multithread: bool = True, limit: int = None) -> list:
         t1 = time.time()
-        links = self.important_links("href")
+        links = (
+            self.important_links_href()[:limit]
+            if limit
+            else self.important_links_href()
+        )
         if not links:
             return None
+        print(f"Crawling {str(len(links))} link (child)")
         container = []
         if not multithread:
             container = [WebPage(link) for link in links]
@@ -319,18 +356,34 @@ class WebPage:
                 executor.map(maper, links)
 
         self.children_crawl_time_seconds = round(time.time() - t1, 3)
+        print(
+            f"We have {str(len(container))} WebPage instance (child) now as ready children"
+        )
+        print("Crawl time : " + str(self.children_crawl_time_seconds) + " sec")
         return container
 
-    def save_full_json(self):
-        children = self.children()
+    def save_full_json(self , limit : int = None):
+        children = self.children(limit=limit)
         dicts = []
         for p in children:
             d = {
                 "name": p.main_h1().text if p.main_h1() else None,
                 "url": p.url,
-                "topics": p.article.topics(),
+                "topics": p.article.topics() if p.article else None,
             }
             dicts.append(d)
         with open("test.json", "w", encoding="utf-8") as f:
             f.write(json.dumps(dicts, indent=4, ensure_ascii=False))
         print("saved")
+
+    def favicon_src(self):
+        all = [t for t in self.soup.select('link[rel*="icon"]')]
+        if not all : return None
+        
+        els_with_sizes = [t for t in all if t.get('sizes' , None)]
+        if not els_with_sizes : return link_of(all[0] , self.url)
+        
+        links_size_sorted = sorted(els_with_sizes , key= lambda x : int(x['sizes'].split("x")[0]), reverse=True)
+        biggest_img = links_size_sorted[0]
+        
+        return link_of(biggest_img , self.url)

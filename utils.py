@@ -21,7 +21,7 @@ def is_url_root(url: str) -> bool:
             pass
         return result
     else:
-        raise Exception(f"{url} Must be a http/https form")
+        raise Exception(f"{url} Must be an http/https pattern")
 
 
 def url_spliter(url: str, root: bool = False) -> list:
@@ -39,6 +39,10 @@ def url_spliter(url: str, root: bool = False) -> list:
 
 
 def link_of(a_tag: Tag, root_url: str) -> str:
+    if not isinstance(a_tag, Tag):
+        raise TypeError(
+            f"First argument has to be a Tag instance , [{str(a_tag)}] is {str(type(a_tag))}"
+        )
     if a_tag is None:
         return
     href = a_tag["href"]
@@ -100,5 +104,5 @@ def page_name(soup: BeautifulSoup) -> str:
         if ":" in title
         else title.split("،")
     )
-    name = splited[1] if len(splited) >= 2 else None
+    name = splited[1] if len(splited) >= 2 else "منبع"
     return name
