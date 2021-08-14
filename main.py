@@ -2,56 +2,18 @@ import time, json, datetime, uuid
 from bs4.element import Tag
 from concurrent.futures import ThreadPoolExecutor
 import re
+from dateutil import parser
 
 from web_crawler.utils import *
 from web_crawler import crawl_utils
 from web_crawler.text_process_utils import TextSimilarity
 
-# from hazm import *
-
-
-class PageCard:
-    def __init__(self, card_tag: Tag, root_url: str) -> None:
-        self.tag = card_tag
-        self.url = root_url
-
-    def all_texted_links(self):
-        return self.tag.find_all("a", href=True, text=True)
-
-    def main_link_tag(self):
-        main_h = self.tag.find("h2") or self.tag.find("h3") or self.tag.find("h4")
-        a = main_h.find("a", href=True, text=True) if main_h else None
-        return a
-
-    def main_link_href(self):
-        return link_of(self.main_link_tag(), self.url)
-
-    def topic_link_tag(self):
-        all_links = self.all_texted_links()
-        all_except_main = [a for a in all_links if a.text != self.main_link_tag().text]
-        if len(all_except_main) < 1:
-            return None
-        return all_except_main[0]
-
-    def topic_link_href(self):
-        return link_of(self.topic_link_tag(), self.url)
-
-    def __str__(self) -> str:
-        ml = self.main_link_tag()
-        return (
-            ml.text
-            + f"\n{self.main_link_href()}\n{self.topic_link_tag().text if self.topic_link_tag() else None}\n{self.topic_link_href()}"
-            if ml
-            else "No title"
-        )
 
 
 class ArticleTag:
     def __init__(self, soup) -> None:
         self.root_name = page_name(soup)
         self.soup = soup
-        # most_h2_el = sorted(soup.body.find_all('div') , key=lambda x : len(x.contents) ,reverse=True)[0]
-        # print(most_h2_el.get('class' , most_h2_el.get('id' , most_h2_el)))
         self.tag = soup.find("article")
 
     def text(self) -> str:
@@ -69,6 +31,27 @@ class ArticleTag:
     def a_tags(self):
         tags = [t for t in self.tag.find_all("a", href=True) if "/" in t["href"]]
         return tags
+    
+    def all_mp3_src(self):
+        tags = self.soup.body.select('*[href*=".mp3"]')
+        if not tags : return None
+        return [t['href'] for t in tags]
+
+    def last_modified_date(self):
+        published_time_tag = self.soup.find(
+            "meta", {"property": "article:published_time"}
+        )
+        modified_time_tag = self.soup.find(
+            "meta", {"property": "article:modified_time"}
+        )
+        date = None
+        if modified_time_tag and modified_time_tag.get("content", None):
+            date = modified_time_tag["content"]
+        elif published_time_tag and published_time_tag.get("content", None):
+            date = published_time_tag["content"]
+        else:
+            return None
+        return parser.parse(date)
 
     def topics(self):
         # print("topcis called")
@@ -87,15 +70,16 @@ class ArticleTag:
         print(nav)
 
         def name(n: str) -> str:
-            return n.strip().replace("\n" , "")
+            return n.strip().replace("\n", "")
 
         def ok_tags(tags: list):
-            def ok(t : str):
-                t = t.strip().replace("\n" , "")
+            def ok(t: str):
+                t = t.strip().replace("\n", "")
                 bads = "خانه صفحه اصلی"
                 one = self.root_name not in t
                 two = t not in bads
                 return one and two
+
             return [tag_name for tag_name in tags if ok(tag_name)]
 
         tags = []
@@ -362,7 +346,7 @@ class WebPage:
         print("Crawl time : " + str(self.children_crawl_time_seconds) + " sec")
         return container
 
-    def save_full_json(self , limit : int = None):
+    def save_full_json(self, limit: int = None):
         children = self.children(limit=limit)
         dicts = []
         for p in children:
@@ -378,12 +362,16 @@ class WebPage:
 
     def favicon_src(self):
         all = [t for t in self.soup.select('link[rel*="icon"]')]
-        if not all : return None
-        
-        els_with_sizes = [t for t in all if t.get('sizes' , None)]
-        if not els_with_sizes : return link_of(all[0] , self.url)
-        
-        links_size_sorted = sorted(els_with_sizes , key= lambda x : int(x['sizes'].split("x")[0]), reverse=True)
+        if not all:
+            return None
+
+        els_with_sizes = [t for t in all if t.get("sizes", None)]
+        if not els_with_sizes:
+            return link_of(all[0], self.url)
+
+        links_size_sorted = sorted(
+            els_with_sizes, key=lambda x: int(x["sizes"].split("x")[0]), reverse=True
+        )
         biggest_img = links_size_sorted[0]
-        
-        return link_of(biggest_img , self.url)
+
+        return link_of(biggest_img, self.url)
