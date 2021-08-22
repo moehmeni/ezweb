@@ -1,6 +1,6 @@
 import json
 from typing import Union
-from dateutil.parser import parse
+from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
 #
@@ -28,41 +28,46 @@ class EzSoup:
         return self.soup.get_text(separator="\n", strip=True)
 
     @property
-    def summary_text(self):
+    def main_text(self):
         result = extract(self.content, include_tables=False , include_comments=False , no_fallback=True)
         return result
 
     @property
-    def summary_html(self):
+    def main_html(self):
         doc = Document(self.content)
         return doc.summary()
 
     @property
     def meta_description(self):
-        return self.helper.meta("description").get("content", None)
+        normal = self.helper.meta_content("name" , "description")
+        og = self.helper.meta_og_content("description")
+        return normal or og
 
     @property
-    def meta_image(self):
-        return self.helper.meta("og:image").get("content", None)
+    def meta_image_src(self):
+        return self.helper.meta_og_content("image")
 
     @property
     def meta_article_published_time(self):
-        meta = self.helper.meta("article:published_time")
-        if not meta:
+        try :
+            time = self.helper.meta_content("property" , "article:published_time")
+            return date_parse(time)
+        except Exception as e :
             return None
-        return parse(meta["content"])
 
     @property
     def meta_article_modified_time(self):
-        meta = self.helper.meta("article:modified_time")
-        if not meta:
+        try :
+            time = self.helper.meta_content("property" , "article:modified_time")
+            return date_parse(time)
+        except Exception as e :
             return None
-        return parse(meta["content"])
 
     @property
-    def display_image_src(self):
-        image = self.meta_image
-        return image["src"]
+    def main_image_src(self):
+        # TODO: Also add article main image to the result
+        result = self.meta_image_src
+        return result
 
     @property
     def article_tag(self):
@@ -131,7 +136,10 @@ class EzSoup:
                     return header.text
 
         # default : return the first h1 tag text or original page title text
-        return h1s[0].text if h1s[0] else page_title
+        if h1s :
+            return h1s[0].get_text(strip=True)
+        else :
+            return page_title
 
     @property
     def important_a_tags(self):
@@ -165,12 +173,23 @@ class EzSoup:
         return [a["href"] for a in self.important_a_tags]
 
     @property
+    def possible_topic_names(self):
+        """
+        returns possible topic/breadcrump names of webpage
+        ### values can be unreliable since they aren't generated with NLP methods yet .
+        """
+        return self.helper.possible_topic_names
+
+    @property
     def json_summary(self):
         obj = {
             "title": self.title,
-            "content": self.summary_text,
+            "description" : self.meta_description ,
+            "main_image" : self.main_image_src,
+            "main_content": self.main_text[:100] +" ...",
+            "possible_topics" : self.possible_topic_names,
         }
-        return json.dumps(obj, indent=4, sort_keys=True)
+        return json.dumps(obj, indent=4)
 
     def save_content_summary_txt(self, path: str = None):
         _path = path or (self.title + ".txt")
