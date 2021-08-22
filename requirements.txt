@@ -2,3 +2,5 @@ requests
 beautifulsoup4
 hazm
 python-dateutil
+rapidfuzz
+trafilatura
