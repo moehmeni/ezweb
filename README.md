@@ -1,5 +1,5 @@
 # EzWeb
- An easy to use web scraper (crawler) with many cool features  written in python
+ An easy to use web scraper (crawler) with many useful features and properties
  
 ## Installation
 ```
