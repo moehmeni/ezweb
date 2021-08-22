@@ -1,6 +1,7 @@
 requests
 beautifulsoup4
-hazm
 python-dateutil
 rapidfuzz
+readability-lxml
 trafilatura
+# hazm

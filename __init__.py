@@ -1,1 +1,1 @@
-from .main import WebPage
+from ezweb.objects import EzPage

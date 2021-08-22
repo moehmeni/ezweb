@@ -1,6 +1,8 @@
 import json
 from typing import Union
 from dateutil.parser import parse
+from trafilatura import extract
+from readability import Document
 #
 from ezweb.utils.http import safe_get, soup_of
 from ezweb.utils.text import similarity_of
@@ -9,7 +11,8 @@ from ezweb.utils.souphelper import EzSoupHelper
 
 class EzSoup:
     def __init__(self, content: Union[str, bytes]) -> None:
-        self.soup = soup_of(content)
+        self.content = content
+        self.soup = soup_of(self.content)
         self.helper = EzSoupHelper(self.soup)
 
     @staticmethod
@@ -23,6 +26,16 @@ class EzSoup:
     @property
     def text(self):
         return self.soup.get_text(separator="\n", strip=True)
+
+    @property
+    def summary_text(self):
+        result = extract(self.content, include_tables=False , include_comments=False , no_fallback=True)
+        return result
+
+    @property
+    def summary_html(self):
+        doc = Document(self.content)
+        return doc.summary()
 
     @property
     def meta_description(self):
@@ -155,9 +168,19 @@ class EzSoup:
     def json_summary(self):
         obj = {
             "title": self.title,
-            "content": self.helper.summary,
+            "content": self.summary_text,
         }
         return json.dumps(obj, indent=4, sort_keys=True)
+
+    def save_content_summary_txt(self, path: str = None):
+        _path = path or (self.title + ".txt")
+        with open(_path, mode="w", encoding="utf-8") as f:
+            f.write(self.summary_text)
+
+    def save_content_summary_html(self, path: str = None):
+        _path = path or (self.title + ".html")
+        with open(_path, mode="w", encoding="utf-8") as f:
+            f.write(self.summary_html)
 
     def save_content_summary_json(self, path: str = None):
         _path = path or (self.title + ".json")

@@ -1,17 +1,11 @@
 from typing import List
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from trafilatura import extract
 
 
 class EzSoupHelper:
     def __init__(self, soup: BeautifulSoup) -> None:
         self.soup = soup
-
-    @property
-    def summary(self):
-        result = extract(self.soup.markup , include_comments=False, include_tables=False, no_fallback=True)
-        return result
 
     @property
     def possible_topics_tags(self) -> List[Tag]:
