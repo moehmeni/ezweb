@@ -1,5 +1,5 @@
 # EzWeb
- An easy to use web page scraper/crawler/analyzer with many useful features and properties
+ An easy to use web page analyzer (scraper or crawler) with many useful features and properties
  
 ## Installation
 ```
