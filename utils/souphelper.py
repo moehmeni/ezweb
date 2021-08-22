@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
@@ -8,23 +8,43 @@ class EzSoupHelper:
         self.soup = soup
 
     @property
-    def possible_topics_tags(self) -> List[Tag]:
+    def possible_topic_tags(self) -> List[Tag]:
+        """
+        returns possible topic/breadcrump tags of webpage
+        generated from soup (HTML) itself . 
+        """
 
         id_bread = self.all_contains("id", "breadcrumb")
         class_bread = self.all_contains("class", "breadcrumb")
         class_cat = self.contains("div", "class", "cat")
         class_tag = self.contains("div", "class", "tag")
 
-        maybe_elements = id_bread + class_bread + class_cat + class_tag
-        article_ul_tag = self.first("article").find("ul")
+        maybe_elements_containers = id_bread + class_bread + class_cat + class_tag
+        maybe_elements = []
 
-        return maybe_elements + article_ul_tag
+        # filling maybe_elements with all <a> in selected parents (containers)
+        for el in maybe_elements_containers:
+            a_tags = el.find_all("a")
+            if a_tags :
+                for a in a_tags :
+                    maybe_elements.append(a)
+
+        article_ul_tag = self.first("article").find("ul")
+        article_ul_a = article_ul_tag.find_all("a")
+
+        tags = maybe_elements + article_ul_a
+        return tags
 
     @property
-    def topics(self):
-        return [t.get_text(strip=True) for t in self.possible_topics_tags]
+    def possible_topic_names(self):
+        result = []
+        for tag in self.possible_topic_tags :
+            text = tag.get_text(strip=True) 
+            if text != "" :
+                result.append(text)
+        return list(set(result))
 
-    def all(self, tag_name: str, **kwargs):
+    def all(self, tag_name: str, **kwargs) -> Union[List[Tag] , None]:
         return self.soup.find_all(tag_name, **kwargs)
 
     def first(self, tag_name: str, *args, **kwargs):
@@ -36,8 +56,16 @@ class EzSoupHelper:
     def all_contains(self, attr: str, value: str):
         return self.contains("*", attr, value)
 
-    def meta(self, property):
-        return self.first("meta", {"property": property})
+    def meta(self, key : str , name : str):
+        return self.first("meta", {key: name})
+
+    def meta_content(self , key : str , name : str):
+        tag = self.meta(key , name)
+        if not tag : return None
+        return tag.get("content" , None)
+
+    def meta_og_content(self , name : str):
+        return self.meta_content("property" , f"og:{name}")
 
     def contains(self, tag_name: str, attr: str, value: str):
         """
