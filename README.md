@@ -16,5 +16,22 @@ print(page.json_summary)
 ```
 Output :
 ```json
+{
+    "title": "Google Pixel 5 review",
 
+    "description": 
+    "The Google Pixel 5 sheds a few features to  become a more affordable and compact phone that still takes great photos at a competitive price.",
+
+    "main_image": "https://cdn.mos.cms.futurecdn.net/EicnoxJ3tKYhTRqEauB6RU-1200-80.jpg",
+
+    "main_content":
+     "Two-minute review\nThe Google Pixel 5 represents a strategy change for the tech giant: the phone does", // [And more ...]
+
+    "possible_topics": 
+    [
+        "Mobile Phones",
+        "Reviews",
+        "Home"
+    ]
+}
 ```
