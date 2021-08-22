@@ -1,5 +1,5 @@
 # EzWeb
- An easy to use web scraper (crawler) with many cool features  written in python
+ An easy to use web page analyzer (scraper or crawler) with many useful features and properties
  
 ## Installation
 ```
@@ -8,6 +8,7 @@ pip install ezweb
 ## Usage
 ```python
 from ezweb import EzSoup
+
 url = "https://www.techradar.com/reviews/google-pixel-5"
 
 page = EzSoup.from_url(url)
