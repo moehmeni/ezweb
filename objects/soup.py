@@ -1,3 +1,4 @@
+from ezweb.utils.io import create_file
 import json
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
@@ -10,14 +11,15 @@ from ezweb.utils.souphelper import EzSoupHelper
 
 
 class EzSoup:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str , url : str = None) -> None:
         self.content = content
         self.soup = soup_of(self.content)
+        self.url = url
         self.helper = EzSoupHelper(self.soup)
 
     @staticmethod
     def from_url(url: str):
-        return EzSoup(safe_get(url).text)
+        return EzSoup(safe_get(url).text , url=url)
 
     @property
     def title_tag_text(self):
@@ -189,6 +191,8 @@ class EzSoup:
             "main_content": self.main_text[:100] +" ...",
             "possible_topics" : self.possible_topic_names,
         }
+        if self.url :
+            obj = {**{"url" : self.url} , **obj}
         return obj
 
     @property
@@ -235,16 +239,14 @@ class EzSoup:
         return result
 
     def save_content_summary_txt(self, path: str = None):
-        _path = path or (self.title + ".txt")
-        with open(_path, mode="w", encoding="utf-8") as f:
-            f.write(self.main_text)
+        path = path or (self.title + ".txt")
+        create_file(path , self.main_text)
 
     def save_content_summary_html(self, path: str = None):
-        _path = path or (self.title + ".html")
-        with open(_path, mode="w", encoding="utf-8") as f:
-            f.write(self.main_html)
+        path = path or (self.title + ".html")
+        create_file(path , self.main_html)
 
     def save_content_summary_json(self, path: str = None):
-        _path = path or ("summary" + ".json")
-        with open(_path, mode="w", encoding="utf-8") as f:
-            f.write(self.json_summary)
+        path = path or (self.title + ".json")
+        create_file(path , self.json_summary)
+
