@@ -3,6 +3,7 @@ from typing import Union
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
+from concurrent.futures import ThreadPoolExecutor
 #
 from ezweb.utils.http import safe_get, soup_of
 from ezweb.utils.text import similarity_of
@@ -89,11 +90,11 @@ class EzSoup:
         return [a["href"] for a in self.a_tags_with_href]
 
     @property
-    def mp3_a_tags(self):
+    def a_tags_mp3(self):
         return self.helper.linked_files("mp3")
 
     @property
-    def rar_a_tags(self):
+    def a_tags_rar(self):
         return self.helper.linked_files("rar")
 
     @property
@@ -190,6 +191,45 @@ class EzSoup:
             "possible_topics" : self.possible_topic_names,
         }
         return json.dumps(obj, indent=4)
+
+    @property
+    def children(self):
+        """
+        returns a list of `EzSoup` instances from `self.important_hrefs`
+        ##### using `ThreadPoolExecutor` to crawl children much faster than normal `for` loop
+        """
+        return self.get_important_children_soups()
+
+    def get_important_children_soups(self, multithread: bool = True, limit: int = None):
+        """
+        returns a list of `EzSoup` instances from `self.important_hrefs` 
+        ## Parameters :
+        ---
+        `multithread` :
+        True by default , using `ThreadPoolExecutor` to crawl children much faster
+        ---
+        `limit`:
+        limit children count that will be crawled
+        """
+
+        links_to_crawl = self.important_hrefs
+        links = links_to_crawl[:limit] if limit else links_to_crawl
+        if not links:
+            return None
+
+        result = []
+        if multithread:
+            # request children urls with multiple threads
+            def maper(url: str):
+                result.append(EzSoup.from_url(url))
+
+            with ThreadPoolExecutor() as executor:
+                executor.map(maper, links)
+        else:
+            # normal `for` loop and wait for each request to be completed
+            result = [EzSoup.from_url(url) for url in links]
+
+        return result
 
     def save_content_summary_txt(self, path: str = None):
         _path = path or (self.title + ".txt")
