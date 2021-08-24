@@ -13,7 +13,7 @@ def safe_get(url: str) -> requests.Response:
 
 def soup_from_url(url: str) -> BeautifulSoup:
     response = safe_get(url)
-    return soup_of(response.content)
+    return soup_of(response.text)
 
 
 def soup_of(content : Union[str , bytes]):

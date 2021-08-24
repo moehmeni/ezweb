@@ -1,5 +1,4 @@
 import json
-from typing import Union
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
@@ -11,14 +10,14 @@ from ezweb.utils.souphelper import EzSoupHelper
 
 
 class EzSoup:
-    def __init__(self, content: Union[str, bytes]) -> None:
+    def __init__(self, content: str) -> None:
         self.content = content
         self.soup = soup_of(self.content)
         self.helper = EzSoupHelper(self.soup)
 
     @staticmethod
     def from_url(url: str):
-        return EzSoup(safe_get(url).content)
+        return EzSoup(safe_get(url).text)
 
     @property
     def title_tag_text(self):
@@ -182,7 +181,7 @@ class EzSoup:
         return self.helper.possible_topic_names
 
     @property
-    def json_summary(self):
+    def summary_dict(self):
         obj = {
             "title": self.title,
             "description" : self.meta_description ,
@@ -190,7 +189,11 @@ class EzSoup:
             "main_content": self.main_text[:100] +" ...",
             "possible_topics" : self.possible_topic_names,
         }
-        return json.dumps(obj, indent=4)
+        return obj
+
+    @property
+    def json_summary(self):
+        return json.dumps(self.summary_dict, indent=4 ,ensure_ascii=False)
 
     @property
     def children(self):
@@ -234,14 +237,14 @@ class EzSoup:
     def save_content_summary_txt(self, path: str = None):
         _path = path or (self.title + ".txt")
         with open(_path, mode="w", encoding="utf-8") as f:
-            f.write(self.summary_text)
+            f.write(self.main_text)
 
     def save_content_summary_html(self, path: str = None):
         _path = path or (self.title + ".html")
         with open(_path, mode="w", encoding="utf-8") as f:
-            f.write(self.summary_html)
+            f.write(self.main_html)
 
     def save_content_summary_json(self, path: str = None):
-        _path = path or (self.title + ".json")
+        _path = path or ("summary" + ".json")
         with open(_path, mode="w", encoding="utf-8") as f:
             f.write(self.json_summary)
