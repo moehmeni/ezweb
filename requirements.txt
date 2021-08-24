@@ -4,4 +4,3 @@ python-dateutil
 rapidfuzz
 readability-lxml
 trafilatura
-# hazm

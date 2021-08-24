@@ -5,7 +5,7 @@
 ```
 pip install ezweb
 ```
-## Usage
+## Basic Usage
 ```python
 from ezweb import EzSoup
 
@@ -18,6 +18,8 @@ print(page.json_summary)
 Output :
 ```json
 {
+    "url" : "https://www.techradar.com/reviews/google-pixel-5",
+
     "title": "Google Pixel 5 review",
 
     "description": 
