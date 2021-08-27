@@ -4,6 +4,7 @@ import re
 from typing import List, Union
 from bs4.element import Tag
 import json
+from trafilatura import extract
 from unidecode import unidecode
 from ezweb import EzSoup
 from ezweb.utils.http import soup_from_url
@@ -12,20 +13,32 @@ from ezweb.utils.text import similarity_of
 class EzProduct(EzSoup):
     def __init__(self, url: str) -> None:
         super().__init__(str(soup_from_url(url)))
+        self._main_text_container = None
 
     @property
     def units(self):
         return ["تومان", "ریال", "$"]
 
     @property
+    def main_text(self):
+        if self._main_text_container : return self._main_text_container
+        result = extract(self.content)
+        self._main_text_container = result
+        return result
+        
+    @property
     def second_title(self):
         json_title = self._json_extract(self.application_json , "alternateName")
         if json_title : return json_title
         h1 = self.card.find("h1")
-        els = [self.card.find("h2")] + h1.find_all() if h1 else []
+        els = [self.card.find("h2")] + (h1.find_all() if h1 else [])
+        els = [i for i in els if i is not None]
 
         if not els:
             return None
+
+        print(els)
+
         title = self.title
 
         def _sec_title_criterion(t : Tag):
@@ -40,8 +53,10 @@ class EzProduct(EzSoup):
                 # it is main title itself !
                 return 0
             return sim
-            
-        el = sorted(els , key = lambda t : _sec_title_criterion(t))[-1]
+
+        sorted_with_similarity = sorted(els , key = lambda t : _sec_title_criterion(t))
+        print(sorted_with_similarity)
+        el = sorted_with_similarity[-1]
         if not el : return None
         return el.get_text(strip=True)
 
@@ -58,7 +73,11 @@ class EzProduct(EzSoup):
         if self.application_json:
             prices = self._json_extract(self.application_json , "price")
             if not prices : return None
-            price = prices[-1]
+            price = 0
+            for p in sorted(prices):
+                if p and float(p) != 0:
+                    price = p
+                    break
             # print(f"-----\n Json price : {price} \n-----")
             return price
 
@@ -74,7 +93,7 @@ class EzProduct(EzSoup):
         return f"{price} {unit}"
 
     @property
-    def price_regex(self):
+    def _price_regex(self):
         return re.compile("\d{1,3}(?:[.,/]\d+)*(?:[.,/]\d+)" , re.UNICODE)
 
     @property
@@ -88,10 +107,14 @@ class EzProduct(EzSoup):
 
         def _price_tag_criterion(t : Tag):
             if not t or t.text.strip() == "" : return 0
-            return len(re.findall(self.price_regex, unidecode(t.text)))
+            return len(re.findall(self._price_regex, unidecode(t.text)))
 
-        tag_with_price_format = sorted(resources, key=lambda t:_price_tag_criterion(t) )[-1]
+        tag_with_price_format = sorted(resources, key=lambda t:_price_tag_criterion(t))[-1]
         text = tag_with_price_format.get_text(strip=True)
+
+        # tp = self._tag_obj(tag_with_price_format)
+        # print(tp)
+
         for unit in self.units:
 
             if unit in text:
@@ -102,7 +125,7 @@ class EzProduct(EzSoup):
                         text = unidecode(text)
                         break
                     
-                numbers = re.findall(self.price_regex, text)
+                numbers = re.findall(self._price_regex, text)
 
                 if not numbers :
                     tp = self._tag_obj(tag_with_price_format)
@@ -131,6 +154,10 @@ class EzProduct(EzSoup):
         return list(srcs)
 
     @property
+    def specs(self):
+        return self._spec_text_to_json(self.main_text)
+
+    @property
     def card(self) -> Union[Tag, None]:
         class_p = self.helper.all_contains("class", "product")
         id_p = self.helper.all_contains("id", "product")
@@ -142,11 +169,14 @@ class EzProduct(EzSoup):
 
         def main_card_criterion(tag: Tag):
             point = 0
-            # Must have img tag
-            if tag.name == "article":
+            high_score = tag.name == "article" or tag.find("h1")
+            mid_score = len(tag.find_all("h2")) == 1
+            if high_score:
                 point = point + 30
+            if mid_score :
+                point = point + 15
             imgs = self._ok_images(tag.find_all("img"))
-            score = len(tag.find_all("h1") + tag.find_all("h2") + imgs) + point
+            score = len(imgs) + point
             # if score > 2 :
             # print(f"{tag.name} class : {tag.get('class' , None)} , id : {tag.get('id' , None)}   score : {score}")
             return score
@@ -159,15 +189,15 @@ class EzProduct(EzSoup):
     def summary_obj(self):
         # with open("card.txt" , "w" , encoding="utf-8") as f :
         #     f.write(str(self.main_text))
-        main_text = self.main_text
+        # main_text = self.main_text
         obj = {
             "card": self._tag_obj(self.card),
             "title": self.title,
             "second_title": self.second_title,
             "price": self.price,
             "images": self.images_src ,
-            "main_text" : main_text ,
-            "specs" : self._spec_text_to_json(main_text)
+            # "main_text" : main_text ,
+            "specs" : self.specs
         }
         return obj
 
@@ -212,12 +242,26 @@ class EzProduct(EzSoup):
         return values
 
     def _spec_text_to_json(self ,text : str):
+        if not text : return []
+
         regex = re.compile("(.*):(.*)")
-        metches = re.findall(regex ,  text)
+        matched = re.findall(regex ,  text)
         result = []
-        for tup in metches :
-            key , value = tup
+
+        if not matched :
+            splited = text.split("\n")
+            keys = []
+            values = []
+            if splited:
+                for index , w in enumerate(splited):
+                    if index % 2 == 0: keys.append(w)
+                    else : values.append(w)
+                matched = list(zip(keys , values))
+
+        for _tuple in matched :
+            key , value = _tuple
             key = key.replace("-" , "").strip()
             d = {key : value}
             result.append(d)
+
         return result
