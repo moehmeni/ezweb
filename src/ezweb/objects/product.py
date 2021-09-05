@@ -195,7 +195,7 @@ class EzProduct(EzSoup):
             "title": self.title,
             "second_title": self.second_title,
             "price": self.price,
-            "images": self.images_src ,
+            # "images": self.images_src ,
             # "main_text" : main_text ,
             "specs" : self.specs
         }

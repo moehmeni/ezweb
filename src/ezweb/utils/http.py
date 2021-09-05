@@ -1,12 +1,15 @@
-from typing import Union
 import requests
+from pathlib import PurePosixPath
+from typing import Union
 from bs4 import BeautifulSoup, FeatureNotFound
+from urllib.parse import unquote, urlparse
 
 
 def safe_get(url: str) -> requests.Response:
     print(f"Requesting {url}\n")
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    response = requests.get(url , headers=headers)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response
 
@@ -16,11 +19,11 @@ def soup_from_url(url: str) -> BeautifulSoup:
     return soup_of(response.text)
 
 
-def soup_of(content : Union[str , bytes]):
-    try :
+def soup_of(content: Union[str, bytes]):
+    try:
         soup = BeautifulSoup(content, features="lxml")
         return soup
-    except FeatureNotFound as e :
+    except FeatureNotFound as e:
         soup = BeautifulSoup(content, features="html.parser")
         return soup
 
@@ -55,3 +58,7 @@ def url_spliter(url: str, root: bool = False) -> list:
 
     return result
 
+
+def pure_url(url: str):
+    pure = PurePosixPath(unquote(urlparse(url).path))
+    return pure.parts

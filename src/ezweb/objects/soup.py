@@ -1,13 +1,13 @@
-from ezweb.utils.io import create_file
 import json
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
 from concurrent.futures import ThreadPoolExecutor
 #
-from ezweb.utils.http import safe_get, soup_of
-from ezweb.utils.text import similarity_of
-from ezweb.utils.souphelper import EzSoupHelper
+from src.ezweb.utils.http import safe_get, soup_of , pure_url
+from src.ezweb.utils.text import similarity_of
+from src.ezweb.utils.souphelper import EzSoupHelper
+from src.ezweb.utils.io import create_file
 
 
 class EzSoup:
@@ -144,6 +144,10 @@ class EzSoup:
             return page_title
 
     @property
+    def _not_important_routes(self):
+        return ["search" , "cart" , "faq"]
+
+    @property
     def important_a_tags(self):
         """
         returns `a` tags that includes header (h2, h3) inside
@@ -151,28 +155,52 @@ class EzSoup:
         I call these important becuase they're most likely to be
         crawlable contentful webpages
         """
-        a_tags_with_headere_child = [a for a in self.helper.all(
+        a_tags_with_header_child = [a for a in self.helper.all(
             "a") if a.find("h2") or a.find("h3")]
 
         headers = self.helper.all("h2") + self.helper.all("h3")
+        li_tags = self.helper.all("li")
 
         maybes = self.helper.all_contains("class", "item") + \
             self.helper.all_contains("class", "post")
 
-        all = a_tags_with_headere_child + headers + maybes
+        els = [i for i in (a_tags_with_header_child + headers + li_tags + maybes) if i]
         results = []
 
-        for element in all:
+        # print(f"---\n{len(els)} container found\n---")
+
+        for element in els:
+            if not element : continue
+            if element.name == "a" and (element.get("href" , None) is None) : continue
             # element itself can be <a>
             # but if it is not it is div , h2 or h3
             # so find the first <a> inside it
-            if element.get("href", None) or element.find("a").get("href", None):
-                results.append(element)
+            element = element if element.name == "a" else element.find_all("a" , {"href" : True})
+            if element : 
+                if isinstance(element , list):
+                    # it can be a list since we called `find_all` if it's not an <a>
+                    results.extend(element)
+                else :
+                    results.append(element)
+        
         return results
 
     @property
     def important_hrefs(self):
-        return [a["href"] for a in self.important_a_tags]
+        links_set = []
+        for a in self.important_a_tags :
+            if a.get("href" , None):
+                # check if first part is in important routes then count it also.
+                link = self.helper.absolute_href_of(a , self.url)
+                url_parts = pure_url(link)
+
+                if len(url_parts) > 1 and url_parts[1] in self._not_important_routes :
+                    continue
+                if len(url_parts) <= 1 :
+                    continue
+                links_set.append(link)
+
+        return list(set(links_set))
 
     @property
     def possible_topic_names(self):
