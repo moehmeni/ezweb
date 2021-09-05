@@ -6,9 +6,9 @@ from bs4.element import Tag
 import json
 from trafilatura import extract
 from unidecode import unidecode
-from ezweb import EzSoup
+from ezweb.objects import EzSoup
 from ezweb.utils.http import soup_from_url
-from ezweb.utils.text import similarity_of
+from ezweb.utils.text import clean_title, similarity_of
 
 class EzProduct(EzSoup):
     def __init__(self, url: str) -> None:
@@ -28,16 +28,15 @@ class EzProduct(EzSoup):
         
     @property
     def second_title(self):
+        _result = None
         json_title = self._json_extract(self.application_json , "alternateName")
-        if json_title : return json_title
+        if json_title : return clean_title(json_title)
         h1 = self.card.find("h1")
         els = [self.card.find("h2")] + (h1.find_all() if h1 else [])
         els = [i for i in els if i is not None]
 
         if not els:
             return None
-
-        print(els)
 
         title = self.title
 
@@ -55,10 +54,10 @@ class EzProduct(EzSoup):
             return sim
 
         sorted_with_similarity = sorted(els , key = lambda t : _sec_title_criterion(t))
-        print(sorted_with_similarity)
         el = sorted_with_similarity[-1]
+        
         if not el : return None
-        return el.get_text(strip=True)
+        return clean_title(el.text)
 
     @property
     def application_json(self):
