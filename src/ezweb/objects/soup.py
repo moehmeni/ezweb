@@ -5,8 +5,8 @@ from readability import Document
 from concurrent.futures import ThreadPoolExecutor
 
 #
-from ezweb.utils.http import safe_get, soup_of, pure_url
-from ezweb.utils.text import similarity_of , clean_title
+from ezweb.utils.http import safe_get, soup_of, pure_url , name_from_url
+from ezweb.utils.text import similarity_of, clean_title
 from ezweb.utils.souphelper import EzSoupHelper
 from ezweb.utils.io import create_file
 
@@ -21,10 +21,17 @@ class EzSoup:
     @staticmethod
     def from_url(url: str):
         return EzSoup(safe_get(url).text, url=url)
+    
+    @property
+    def site_name_from_host(self):
+        return name_from_url(self.url)
 
     @property
     def title_tag_text(self):
-        return self.helper.first("title").text.split("-")[0]
+        tag = self.helper.first("title")
+        if not tag:
+            return
+        return clean_title(tag.text)
 
     @property
     def text(self):
@@ -33,7 +40,8 @@ class EzSoup:
     @property
     def main_text(self):
         result = extract(
-            self.content, include_tables=False, include_comments=False, no_fallback=True
+            self.content,
+            include_tables=False,
         )
         return result
 
@@ -41,6 +49,10 @@ class EzSoup:
     def main_html(self):
         doc = Document(self.content)
         return doc.summary()
+    
+    @property
+    def site_name(self):
+        return self.helper.site_name
 
     @property
     def meta_description(self):

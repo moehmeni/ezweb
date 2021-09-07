@@ -8,6 +8,20 @@ class EzSoupHelper:
         self.soup = soup
 
     @property
+    def site_name(self):
+        og_site_name = self.meta_og_content("site_name")
+        twitter_meta = self.meta_content("name", "twitter:creator")
+
+        nav = self.first("nav")
+        nav_img = nav.find("img", {"alt": True}) if nav else None
+        nav_img_alt = nav_img["alt"] if nav_img else None
+
+        text = og_site_name or twitter_meta or nav_img_alt
+        if not text:
+            return None
+        return text.strip()
+
+    @property
     def possible_topic_tags(self) -> List[Tag]:
         """
         returns possible topic/breadcrump tags of webpage

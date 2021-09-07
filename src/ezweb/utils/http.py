@@ -62,3 +62,10 @@ def url_spliter(url: str, root: bool = False) -> list:
 def pure_url(url: str):
     pure = PurePosixPath(unquote(urlparse(url).path))
     return pure.parts
+
+
+def name_from_url(url: str):
+    root = urlparse(url).hostname
+    dot_splited = root.split(".")
+    name = dot_splited[1] if "www" in root else dot_splited[0]
+    return name.capitalize()
