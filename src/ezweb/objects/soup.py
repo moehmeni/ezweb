@@ -114,6 +114,19 @@ class EzSoup:
     @property
     def a_tags_rar(self):
         return self.helper.linked_files("rar")
+    
+    @property
+    def is_article(self):
+        """
+        check the page is a true article page or not
+        """
+        article_tag = self.article_tag
+        if not article_tag or not article_tag.text : return False
+        if len(article_tag.text.strip()) < 350: return False
+        date = self.meta_article_published_time or self.meta_article_published_time
+        if not date : return False
+        return True
+        
 
     @property
     def favicon_href(self):
@@ -168,7 +181,7 @@ class EzSoup:
 
     @property
     def _not_important_routes(self):
-        return ["search", "cart", "faq"]
+        return ["search", "cart", "faq" , "about-us" , "terms" , "landings"]
 
     @property
     def important_a_tags(self):
