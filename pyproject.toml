@@ -2,11 +2,5 @@
 requires = [
     "setuptools>=42",
     "wheel",
-    "requests",
-    "beautifulsoup4",
-    "python-dateutil",
-    "rapidfuzz",
-    "readability-lxml",
-    "trafilatura",
 ]
 build-backend = "setuptools.build_meta"
