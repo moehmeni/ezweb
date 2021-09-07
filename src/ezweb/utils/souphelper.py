@@ -127,8 +127,8 @@ class EzSoupHelper:
 
     def _ok_topic_name(self, name: str):
         reason = None
-        if not name or name == "":
-            # print("Null topic name")
+        if not name or name == "" or len(name) > 26:
+            # print("Null topic name or many charachters")
             return False
         site_name = self.site_name
         msg = f"| name : {name} , site name : {site_name}"
