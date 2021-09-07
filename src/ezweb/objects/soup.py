@@ -3,15 +3,16 @@ from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
 from concurrent.futures import ThreadPoolExecutor
+
 #
-from src.ezweb.utils.http import safe_get, soup_of , pure_url
-from src.ezweb.utils.text import similarity_of
-from src.ezweb.utils.souphelper import EzSoupHelper
-from src.ezweb.utils.io import create_file
+from ezweb.utils.http import safe_get, soup_of, pure_url
+from ezweb.utils.text import similarity_of , clean_title
+from ezweb.utils.souphelper import EzSoupHelper
+from ezweb.utils.io import create_file
 
 
 class EzSoup:
-    def __init__(self, content: str , url : str = None) -> None:
+    def __init__(self, content: str, url: str = None) -> None:
         self.content = content
         self.soup = soup_of(self.content)
         self.url = url
@@ -19,7 +20,7 @@ class EzSoup:
 
     @staticmethod
     def from_url(url: str):
-        return EzSoup(safe_get(url).text , url=url)
+        return EzSoup(safe_get(url).text, url=url)
 
     @property
     def title_tag_text(self):
@@ -31,7 +32,9 @@ class EzSoup:
 
     @property
     def main_text(self):
-        result = extract(self.content, include_tables=False , include_comments=False , no_fallback=True)
+        result = extract(
+            self.content, include_tables=False, include_comments=False, no_fallback=True
+        )
         return result
 
     @property
@@ -41,7 +44,7 @@ class EzSoup:
 
     @property
     def meta_description(self):
-        normal = self.helper.meta_content("name" , "description")
+        normal = self.helper.meta_content("name", "description")
         og = self.helper.meta_og_content("description")
         return normal or og
 
@@ -51,18 +54,18 @@ class EzSoup:
 
     @property
     def meta_article_published_time(self):
-        try :
-            time = self.helper.meta_content("property" , "article:published_time")
+        try:
+            time = self.helper.meta_content("property", "article:published_time")
             return date_parse(time)
-        except Exception as e :
+        except Exception as e:
             return None
 
     @property
     def meta_article_modified_time(self):
-        try :
-            time = self.helper.meta_content("property" , "article:modified_time")
+        try:
+            time = self.helper.meta_content("property", "article:modified_time")
             return date_parse(time)
-        except Exception as e :
+        except Exception as e:
             return None
 
     @property
@@ -105,14 +108,16 @@ class EzSoup:
             return None
 
         multiple_sized_icon_links = [
-            link for link in icon_links if link.get("sizes", None)]
+            link for link in icon_links if link.get("sizes", None)
+        ]
         if not multiple_sized_icon_links:
             # return the only one src
             return icon_links[0].get("href", None)
 
         # sort links with their icon image sizes
         sorted_sized_icon_links = sorted(
-            multiple_sized_icon_links, key=lambda t: int(t["sizes"].split("x")[0]))
+            multiple_sized_icon_links, key=lambda t: int(t["sizes"].split("x")[0])
+        )
         biggest_icon_link_tag = sorted_sized_icon_links[-1]
 
         return biggest_icon_link_tag.get("href", None)
@@ -122,9 +127,10 @@ class EzSoup:
         """
         usually the `<h1>` tag content of a web page
         is cleaner than original page `<title>` text
-        so if the h1 or h2 text is similar to the title 
+        so if the h1 or h2 text is similar to the title
         it is better to return it instead of original title text
         """
+        _result = None
         h1s = self.helper.all("h1")
         h2s = self.helper.all("h2")
         headers = h1s or h2s
@@ -135,17 +141,20 @@ class EzSoup:
                 # getting the similarity of h1 and original title
                 # using `rapidfuzz` library (fuzz.ratio)
                 if similarity_of(header_tag_text, page_title) >= 70:
-                    return header.text
+                    _result = header.text
+                    break
 
         # default : return the first h1 tag text or original page title text
-        if h1s :
-            return h1s[0].get_text(strip=True)
-        else :
-            return page_title
+        if h1s:
+            _result = h1s[0].text
+        else:
+            _result = page_title
+
+        return clean_title(_result)
 
     @property
     def _not_important_routes(self):
-        return ["search" , "cart" , "faq"]
+        return ["search", "cart", "faq"]
 
     @property
     def important_a_tags(self):
@@ -155,14 +164,16 @@ class EzSoup:
         I call these important becuase they're most likely to be
         crawlable contentful webpages
         """
-        a_tags_with_header_child = [a for a in self.helper.all(
-            "a") if a.find("h2") or a.find("h3")]
+        a_tags_with_header_child = [
+            a for a in self.helper.all("a") if a.find("h2") or a.find("h3")
+        ]
 
         headers = self.helper.all("h2") + self.helper.all("h3")
         li_tags = self.helper.all("li")
 
-        maybes = self.helper.all_contains("class", "item") + \
-            self.helper.all_contains("class", "post")
+        maybes = self.helper.all_contains("class", "item") + self.helper.all_contains(
+            "class", "post"
+        )
 
         els = [i for i in (a_tags_with_header_child + headers + li_tags + maybes) if i]
         results = []
@@ -170,33 +181,39 @@ class EzSoup:
         # print(f"---\n{len(els)} container found\n---")
 
         for element in els:
-            if not element : continue
-            if element.name == "a" and (element.get("href" , None) is None) : continue
+            if not element:
+                continue
+            if element.name == "a" and (element.get("href", None) is None):
+                continue
             # element itself can be <a>
             # but if it is not it is div , h2 or h3
             # so find the first <a> inside it
-            element = element if element.name == "a" else element.find_all("a" , {"href" : True})
-            if element : 
-                if isinstance(element , list):
+            element = (
+                element
+                if element.name == "a"
+                else element.find_all("a", {"href": True})
+            )
+            if element:
+                if isinstance(element, list):
                     # it can be a list since we called `find_all` if it's not an <a>
                     results.extend(element)
-                else :
+                else:
                     results.append(element)
-        
+
         return results
 
     @property
     def important_hrefs(self):
         links_set = []
-        for a in self.important_a_tags :
-            if a.get("href" , None):
+        for a in self.important_a_tags:
+            if a.get("href", None):
                 # check if first part is in important routes then count it also.
-                link = self.helper.absolute_href_of(a , self.url)
+                link = self.helper.absolute_href_of(a, self.url)
                 url_parts = pure_url(link)
 
-                if len(url_parts) > 1 and url_parts[1] in self._not_important_routes :
+                if len(url_parts) > 1 and url_parts[1] in self._not_important_routes:
                     continue
-                if len(url_parts) <= 1 :
+                if len(url_parts) <= 1:
                     continue
                 links_set.append(link)
 
@@ -214,18 +231,18 @@ class EzSoup:
     def summary_dict(self):
         obj = {
             "title": self.title,
-            "description" : self.meta_description ,
-            "main_image" : self.main_image_src,
-            "main_content": self.main_text[:100] +" ...",
-            "possible_topics" : self.possible_topic_names,
+            "description": self.meta_description,
+            "main_image": self.main_image_src,
+            "main_content": self.main_text[:100] + " ...",
+            "possible_topics": self.possible_topic_names,
         }
-        if self.url :
-            obj = {**{"url" : self.url} , **obj}
+        if self.url:
+            obj = {**{"url": self.url}, **obj}
         return obj
 
     @property
     def json_summary(self):
-        return json.dumps(self.summary_dict, indent=4 ,ensure_ascii=False)
+        return json.dumps(self.summary_dict, indent=4, ensure_ascii=False)
 
     @property
     def children(self):
@@ -237,7 +254,7 @@ class EzSoup:
 
     def get_important_children_soups(self, multithread: bool = True, limit: int = None):
         """
-        returns a list of `EzSoup` instances from `self.important_hrefs` 
+        returns a list of `EzSoup` instances from `self.important_hrefs`
         ## Parameters :
         ---
         `multithread` :
@@ -268,13 +285,12 @@ class EzSoup:
 
     def save_content_summary_txt(self, path: str = None):
         path = path or (self.title + ".txt")
-        create_file(path , self.main_text)
+        create_file(path, self.main_text)
 
     def save_content_summary_html(self, path: str = None):
         path = path or (self.title + ".html")
-        create_file(path , self.main_html)
+        create_file(path, self.main_html)
 
     def save_content_summary_json(self, path: str = None):
         path = path or (self.title + ".json")
-        create_file(path , self.json_summary)
-
+        create_file(path, self.json_summary)

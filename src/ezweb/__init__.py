@@ -1,1 +1,1 @@
-from ezweb.objects import EzSoup
+from ezweb.objects import EzSoup , EzProduct
