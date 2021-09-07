@@ -2,6 +2,7 @@ from typing import List, Union
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from ezweb.utils.text import similarity_of
 
 class EzSoupHelper:
     def __init__(self, soup: BeautifulSoup) -> None:
@@ -25,22 +26,29 @@ class EzSoupHelper:
     def possible_topic_tags(self) -> List[Tag]:
         """
         returns possible topic/breadcrump tags of webpage
-        generated from soup (HTML) itself . 
+        generated from soup (HTML) itself .
         """
 
         id_bread = self.all_contains("id", "breadcrumb")
         class_bread = self.all_contains("class", "breadcrumb")
+        breads = id_bread + class_bread
+
         class_cat = self.contains("div", "class", "cat")
         class_tag = self.contains("div", "class", "tag")
+        class_maybe = class_cat + class_tag
 
-        maybe_elements_containers = id_bread + class_bread + class_cat + class_tag
+        # avoid using not related tags
+        if len(class_maybe) > 7:
+            class_maybe = []
+
+        maybe_elements_containers = breads + class_maybe
         maybe_elements = []
 
         # filling maybe_elements with all <a> in selected parents (containers)
         for el in maybe_elements_containers:
             a_tags = el.find_all("a")
-            if a_tags :
-                for a in a_tags :
+            if a_tags:
+                for a in a_tags:
                     maybe_elements.append(a)
 
         article_ul_tag = self.first("article").find("ul")
@@ -51,14 +59,16 @@ class EzSoupHelper:
 
     @property
     def possible_topic_names(self):
+
         result = []
-        for tag in self.possible_topic_tags :
-            text = tag.get_text(strip=True) 
-            if text != "" :
+        for tag in self.possible_topic_tags:
+            text = tag.get_text(strip=True)
+            if self._ok_topic_name(text):
                 result.append(text)
+
         return list(set(result))
 
-    def all(self, tag_name: str, **kwargs) -> Union[List[Tag] , None]:
+    def all(self, tag_name: str, **kwargs) -> Union[List[Tag], None]:
         return self.soup.find_all(tag_name, **kwargs)
 
     def first(self, tag_name: str, *args, **kwargs):
@@ -70,16 +80,17 @@ class EzSoupHelper:
     def all_contains(self, attr: str, value: str):
         return self.contains("*", attr, value)
 
-    def meta(self, key : str , name : str):
+    def meta(self, key: str, name: str):
         return self.first("meta", {key: name})
 
-    def meta_content(self , key : str , name : str):
-        tag = self.meta(key , name)
-        if not tag : return None
-        return tag.get("content" , None)
+    def meta_content(self, key: str, name: str):
+        tag = self.meta(key, name)
+        if not tag:
+            return None
+        return tag.get("content", None)
 
-    def meta_og_content(self , name : str):
-        return self.meta_content("property" , f"og:{name}")
+    def meta_og_content(self, name: str):
+        return self.meta_content("property", f"og:{name}")
 
     def contains(self, tag_name: str, attr: str, value: str):
         """
@@ -112,6 +123,22 @@ class EzSoupHelper:
 
         """
         return self.contains("a", "href", f".{extension}")
+
+    def _ok_topic_name(self, name: str):
+        reason = None
+        if not name or name == "":
+            # print("Null topic name")
+            return False
+        site_name = self.site_name
+        msg = f"| name : {name} , site name : {site_name}"
+        if name == site_name:
+            print(f"Topic name is exactly site name {msg}")
+            return False
+        sim = similarity_of(name, site_name)
+        if sim > 65:
+            print(f"Topic name is similar with site name {msg} , similarity : {sim}")
+            return False
+        return True
 
     @staticmethod
     def absolute_href_of(a_tag: Tag, root_url: str) -> str:
