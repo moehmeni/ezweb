@@ -51,8 +51,9 @@ class EzSoupHelper:
                 for a in a_tags:
                     maybe_elements.append(a)
 
-        article_ul_tag = self.first("article").find("ul")
-        article_ul_a = article_ul_tag.find_all("a")
+        article = self.first("article")
+        article_ul_tag = article.find("ul") if article else None
+        article_ul_a = article_ul_tag.find_all("a") if article_ul_tag else []
 
         tags = maybe_elements + article_ul_a
         return tags
