@@ -91,7 +91,9 @@ class EzSoup:
         """
         returns an article tag which has the most text length
         """
-        return sorted(self.helper.all("article"), key=lambda tag: len(tag.text))[-1]
+        articles = self.helper.all("article")
+        if not articles : return None
+        return sorted(articles, key=lambda tag: len(tag.text))[-1]
 
     @property
     def a_tags_with_href(self):
