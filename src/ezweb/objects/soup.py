@@ -1,11 +1,12 @@
 import json
+from bs4.element import Tag
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
 from concurrent.futures import ThreadPoolExecutor
 
 #
-from ezweb.utils.http import safe_get, soup_of, pure_url , name_from_url
+from ezweb.utils.http import safe_get, soup_of, pure_url, name_from_url
 from ezweb.utils.text import similarity_of, clean_title
 from ezweb.utils.souphelper import EzSoupHelper
 from ezweb.utils.io import create_file
@@ -21,7 +22,7 @@ class EzSoup:
     @staticmethod
     def from_url(url: str):
         return EzSoup(safe_get(url).text, url=url)
-    
+
     @property
     def site_name_from_host(self):
         return name_from_url(self.url)
@@ -49,7 +50,7 @@ class EzSoup:
     def main_html(self):
         doc = Document(self.content)
         return doc.summary()
-    
+
     @property
     def site_name(self):
         return self.helper.site_name
@@ -82,18 +83,33 @@ class EzSoup:
 
     @property
     def main_image_src(self):
-        # TODO: Also add article main image to the result
-        result = self.meta_image_src
-        return result
-
+        return self.meta_image_src or self.article_tag_image_src
+        
     @property
     def article_tag(self):
         """
         returns an article tag which has the most text length
         """
         articles = self.helper.all("article")
-        if not articles : return None
+        if not articles:
+            return None
         return sorted(articles, key=lambda tag: len(tag.text))[-1]
+
+    @property
+    def article_tag_image(self):
+        """
+        returns the image which has the most similarity
+        with the page title
+        """
+        images = self.article_tag_images
+        if not images : return None
+        return images[0]
+    
+    @property
+    def article_tag_image_src(self):
+        image = self.article_tag_image
+        if not image : return None
+        return image.get("src" , None)
 
     @property
     def a_tags_with_href(self):
@@ -114,19 +130,33 @@ class EzSoup:
     @property
     def a_tags_rar(self):
         return self.helper.linked_files("rar")
-    
+
+    @property
+    def article_tag_images(self):
+        def _img_criterion(img: Tag):
+            sim = similarity_of(page_title, img.get("alt", "").strip())
+            return sim
+        images = self.article_tag.find_all("img", {"src": True, "alt": True})
+        if not images : return []
+        page_title = self.title
+        # the first image alt has the most similarity with title
+        images = sorted(images, key=lambda x: _img_criterion(x) , reverse=True)
+        return images
+
     @property
     def is_article(self):
         """
         check the page is a true article page or not
         """
         article_tag = self.article_tag
-        if not article_tag or not article_tag.text : return False
-        if len(article_tag.text.strip()) < 350: return False
+        if not article_tag or not article_tag.text:
+            return False
+        if len(article_tag.text.strip()) < 350:
+            return False
         date = self.meta_article_published_time or self.meta_article_published_time
-        if not date : return False
+        if not date:
+            return False
         return True
-        
 
     @property
     def favicon_href(self):
@@ -181,7 +211,7 @@ class EzSoup:
 
     @property
     def _not_important_routes(self):
-        return ["search", "cart", "faq" , "about-us" , "terms" , "landings"]
+        return ["search", "cart", "faq", "about-us", "terms", "landings"]
 
     @property
     def important_a_tags(self):
