@@ -1,3 +1,4 @@
+from collections import Counter
 import json
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
@@ -84,7 +85,7 @@ class EzSoup:
     @property
     def main_image_src(self):
         return self.meta_image_src or self.article_tag_image_src
-        
+
     @property
     def article_tag(self):
         """
@@ -102,14 +103,16 @@ class EzSoup:
         with the page title
         """
         images = self.article_tag_images
-        if not images : return None
+        if not images:
+            return None
         return images[0]
-    
+
     @property
     def article_tag_image_src(self):
         image = self.article_tag_image
-        if not image : return None
-        return image.get("src" , None)
+        if not image:
+            return None
+        return image.get("src", None)
 
     @property
     def a_tags_with_href(self):
@@ -136,11 +139,13 @@ class EzSoup:
         def _img_criterion(img: Tag):
             sim = similarity_of(page_title, img.get("alt", "").strip())
             return sim
+
         images = self.article_tag.find_all("img", {"src": True, "alt": True})
-        if not images : return []
+        if not images:
+            return []
         page_title = self.title
         # the first image alt has the most similarity with title
-        images = sorted(images, key=lambda x: _img_criterion(x) , reverse=True)
+        images = sorted(images, key=lambda x: _img_criterion(x), reverse=True)
         return images
 
     @property
@@ -261,20 +266,46 @@ class EzSoup:
 
     @property
     def important_hrefs(self):
-        links_set = []
+        links_container = []
+        url_part_count_container = []
         for a in self.important_a_tags:
             if a.get("href", None):
                 # check if first part is in important routes then count it also.
                 link = self.helper.absolute_href_of(a, self.url)
-                url_parts = pure_url(link)
-
-                if len(url_parts) > 1 and url_parts[1] in self._not_important_routes:
+                parts = pure_url(link)
+                parts_count = len(parts)
+                just_one_route = parts_count == 2
+                if "/#" in link:
                     continue
-                if len(url_parts) <= 1:
+                if parts_count > 1 and parts[1] in self._not_important_routes:
                     continue
-                links_set.append(link)
+                if parts_count <= 1:
+                    continue
+                if just_one_route and "@" in parts[1]:
+                    continue
+                last_part = parts[-1]
+                if len(last_part) < 4:
+                    continue
 
-        return list(set(links_set))
+                url_part_count_container.append(parts_count)
+                links_container.append(link)
+
+        # for example if 3 is the number just count the urls which has 3 part
+        # beacause they're most possible items that can be a main link of the web page
+        most_repeated_url_part_number = Counter(url_part_count_container).most_common(
+            1
+        )[0][0]
+        print(
+            f"I guess the urls which has {most_repeated_url_part_number} part(s) are the main ones"
+        )
+
+        _list = list(set(links_container))
+
+        result = list(
+            filter(lambda x: len(pure_url(x)) == most_repeated_url_part_number, _list)
+        )
+
+        return result
 
     @property
     def possible_topic_names(self):
@@ -313,16 +344,17 @@ class EzSoup:
         """
         returns a list of `EzSoup` instances from `self.important_hrefs`
         ## Parameters :
-        ---
         `multithread` :
         True by default , using `ThreadPoolExecutor` to crawl children much faster
-        ---
+
         `limit`:
         limit children count that will be crawled
         """
 
         links_to_crawl = self.important_hrefs
+
         links = links_to_crawl[:limit] if limit else links_to_crawl
+
         if not links:
             return None
 
@@ -351,3 +383,7 @@ class EzSoup:
     def save_content_summary_json(self, path: str = None):
         path = path or (self.title + ".json")
         create_file(path, self.json_summary)
+
+    def save_important_links(self, path: str = None):
+        path = path or (self.title + ".txt")
+        create_file(path, "\n".join(self.important_hrefs))
