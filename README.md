@@ -40,12 +40,15 @@ Output :
 ```
 
 
-## EzSoup usage
-
+## Available properties and methods
  ```python
  # You can use any of below properties and methods instead `a_tags_mp3`
  page.a_tags_mp3
  ```
+<details>
+
+<summary>Click to expand!</summary>
+
 
 #### <kbd>property</kbd> a_tag_hrefs
 
@@ -277,14 +280,11 @@ save_content_summary_json(path: str = None)
 save_content_summary_txt(path: str = None)
 ```
 
-
-
-
-
-
-
+</details>
 
 ---
 
+<sub>
 _This file was automatically generated via [lazydocs](https://github.com/ml-tooling/lazydocs)._
+</sub>
 
