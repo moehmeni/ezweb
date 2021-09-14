@@ -12,15 +12,23 @@ class EzSoupHelper:
     def site_name(self):
         og_site_name = self.meta_og_content("site_name")
         twitter_meta = self.meta_content("name", "twitter:creator")
-
+        
+        # also nav > image `alt` can be the site title !
         nav = self.first("nav")
         nav_img = nav.find("img", {"alt": True}) if nav else None
         nav_img_alt = nav_img["alt"] if nav_img else None
+        # check nav > img : alt similarity with domain root name
+        if nav_img_alt :
+            # for non ascii chars
+            unicoded = unidecode(nav_img_alt)
+            domain_name = name_from_url(self.url)
+            if not similarity_of(unicoded , domain_name) >= 15 :
+                # not reliable img alt
+                nav_img_alt = None
 
         text = og_site_name or twitter_meta or nav_img_alt
-        if not text:
-            return None
-        return text.strip()
+                
+        return clean_title(text)
 
     @property
     def possible_topic_tags(self) -> List[Tag]:
