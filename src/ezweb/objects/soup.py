@@ -7,7 +7,7 @@ from readability import Document
 from concurrent.futures import ThreadPoolExecutor
 
 #
-from ezweb.utils.http import safe_get, soup_of, pure_url, name_from_url
+from ezweb.utils.http import safe_get, soup_of, pure_url, name_from_url, url_host
 from ezweb.utils.text import similarity_of, clean_title
 from ezweb.utils.souphelper import EzSoupHelper
 from ezweb.utils.io import create_file
@@ -18,7 +18,7 @@ class EzSoup:
         self.content = content
         self.soup = soup_of(self.content)
         self.url = url
-        self.helper = EzSoupHelper(self.soup)
+        self.helper = EzSoupHelper(self.soup , self.url)
 
     @staticmethod
     def from_url(url: str):
@@ -27,12 +27,16 @@ class EzSoup:
     @property
     def site_name_from_host(self):
         return name_from_url(self.url)
+    
+    @property
+    def root_domain(self):
+        return url_host(self.url)
 
     @property
     def title_tag_text(self):
         tag = self.helper.first("title")
         if not tag:
-            return
+            return None
         return clean_title(tag.text)
 
     @property
@@ -54,7 +58,7 @@ class EzSoup:
 
     @property
     def site_name(self):
-        return self.helper.site_name
+        return self.helper.site_name or self.site_name_from_host
 
     @property
     def meta_description(self):
@@ -198,19 +202,17 @@ class EzSoup:
         headers = h1s or h2s
         page_title = self.title_tag_text
         for header in headers:
-            header_tag_text = header.text.strip() if header and header.text else None
+            header_tag_text = clean_title(header.text)
             if header_tag_text is not None:
                 # getting the similarity of h1 and original title
                 # using `rapidfuzz` library (fuzz.ratio)
                 if similarity_of(header_tag_text, page_title) >= 70:
-                    _result = header.text
+                    _result = header_tag_text
                     break
-
-        # default : return the first h1 tag text or original page title text
-        if h1s:
-            _result = h1s[0].text
-        else:
-            _result = page_title
+                
+        if not _result:
+            # print("title from page title tag or finally host name")
+            _result = page_title or self.site_name_from_host
 
         return clean_title(_result)
 
@@ -380,9 +382,9 @@ class EzSoup:
         path = path or (self.title + ".html")
         create_file(path, self.main_html)
 
-    def save_content_summary_json(self, path: str = None):
+    def save_content_summary_json(self, path: str = None , custom_content : str = None):
         path = path or (self.title + ".json")
-        create_file(path, self.json_summary)
+        create_file(path, custom_content or self.json_summary)
 
     def save_important_links(self, path: str = None):
         path = path or (self.title + ".txt")

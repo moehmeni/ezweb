@@ -1,12 +1,17 @@
+from ezweb.utils.http import name_from_url
+import re
 from typing import List, Union
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+from unidecode import unidecode
 
-from ezweb.utils.text import similarity_of
+from ezweb.utils.text import clean_title, similarity_of
+
 
 class EzSoupHelper:
-    def __init__(self, soup: BeautifulSoup) -> None:
+    def __init__(self, soup: BeautifulSoup , url : str) -> None:
         self.soup = soup
+        self.url = url
 
     @property
     def site_name(self):
@@ -86,8 +91,8 @@ class EzSoupHelper:
     def xpath(self, pattern: str):
         return self.soup.select(pattern)
 
-    def all_contains(self, attr: str, value: str):
-        return self.contains("*", attr, value)
+    def all_contains(self, attr: str, value: str, parent_tag_name: str = "*"):
+        return self.contains(parent_tag_name, attr, value)
 
     def meta(self, key: str, name: str):
         return self.first("meta", {key: name})
@@ -148,6 +153,26 @@ class EzSoupHelper:
             print(f"Topic name is similar with site name {msg} , similarity : {sim}")
             return False
         return True
+
+    def _number_groups(self, t: Tag, pattern):
+        text = t.text
+        if not text:
+            return []
+        text = text.strip().replace("\n", "").replace(" ", "")
+        text = unidecode(text)
+
+        c = []
+        nums = re.findall(pattern, text)
+        for n in nums:
+            if "-" in n:
+                first = n.split("-")[0]
+                last = n.split("-")[-1]
+                if len(first) > len(last):
+                    # it has reversed wrong (RTL langs)
+                    c.append("".join([last , first]))
+                    break
+            c.append(n)
+        return c
 
     @staticmethod
     def absolute_href_of(a_tag: Tag, root_url: str) -> str:
