@@ -11,9 +11,11 @@ def list_counter(items: list) -> list:
     return result
 
 def clean_title(string : str):
-    if not string : return
+    if not string : return None
     bads = ["-", "|", ",", "،"]
+    result = string.strip().replace("\n", "")
     for w in bads:
         string.replace(w, "")
-    result = string.strip().replace("\n", "")
+    result = string
+    if result == "" : return None
     return result
