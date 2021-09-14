@@ -9,6 +9,7 @@ def create_file(path : str , content : str):
     path = ok_file_name(file_name) + "." + file_extension
     with open(path, mode="w", encoding="utf-8") as f:
         f.write(content)
+    print(f"File created: {path}")
 
 def read_file(path : str):
     with open(path, mode="r", encoding="utf-8") as f:
