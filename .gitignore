@@ -1,4 +1,5 @@
 dist_test
+twine.bat
 *.html
 test/
 
