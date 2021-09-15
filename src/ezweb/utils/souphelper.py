@@ -78,13 +78,18 @@ class EzSoupHelper:
     @lru_cache()
     def table_info(self):
         t = self.first("table")
+        if not t:
+            return []
+        rows = t.find_all("tr")
+        if not rows:
+            return []
         data = [
             {
                 self.tag_text(head): self.tag_text(cell)
                 for cell in row.find_all("td")
                 for head in row.find_all("th")
             }
-            for row in t.find_all("tr")
+            for row in rows
         ]
         return data
 
