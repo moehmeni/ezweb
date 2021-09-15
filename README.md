@@ -2,13 +2,12 @@
  An easy to use web page analyzer (scraper or crawler) with many useful features and properties
  
 ## Installation
-With GitHub (latest release and recommended)
 ```
-pip install https://github.com/mdmomeni/ezweb/raw/main/dist/ezweb-0.2.0-py3-none-any.whl
+pip install ezweb
 ```
 Or
 ```
-pip install ezweb
+pip install https://github.com/mdmomeni/ezweb/raw/main/dist/ezweb-0.2.0-py3-none-any.whl
 ```
 ## Basic Usage
 ```python
