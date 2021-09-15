@@ -34,8 +34,8 @@ class EzProduct(EzSoup):
     @lru_cache()
     def second_title(self):
         json_title = self._json_extract(self.application_json, "alternateName")
-        if json_title:
-            return clean_title(json_title)
+        if json_title and isinstance(json_title , str):
+            return clean_title(json_title , self.site_name)
         h1 = self.card.find("h1")
         els = [self.card.find("h2")] + (h1.find_all() if h1 else [])
         els = [i for i in els if i is not None]
@@ -66,7 +66,7 @@ class EzProduct(EzSoup):
         if not el:
             return None
 
-        result = clean_title(el.text)
+        result = clean_title(el.text , self.site_name)
         # check sim again since even the sorted list el can be a bad value
         sim = similarity_of(result, title)
         if sim > 95 or sim < 49:
