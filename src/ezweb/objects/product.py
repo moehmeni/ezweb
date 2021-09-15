@@ -4,6 +4,7 @@ from bs4.element import Tag
 import json
 from trafilatura import extract
 from unidecode import unidecode
+from functools import lru_cache
 from ezweb.objects import EzSoup
 from ezweb.utils.http import soup_from_url
 from ezweb.utils.text import clean_title, similarity_of
@@ -16,10 +17,12 @@ class EzProduct(EzSoup):
         self._main_text_container = None
 
     @property
+    @lru_cache()
     def units(self):
         return ["تومان", "ریال", "$"]
 
     @property
+    @lru_cache()
     def main_text(self):
         if self._main_text_container:
             return self._main_text_container
@@ -28,6 +31,7 @@ class EzProduct(EzSoup):
         return result
 
     @property
+    @lru_cache()
     def second_title(self):
         json_title = self._json_extract(self.application_json, "alternateName")
         if json_title:
@@ -71,6 +75,7 @@ class EzProduct(EzSoup):
         return result
 
     @property
+    @lru_cache()
     def application_json(self):
         all_json_tags = self.helper.all("script", attrs={"type": "application/ld+json"})
         tag = sorted(
@@ -81,6 +86,7 @@ class EzProduct(EzSoup):
         return result
 
     @property
+    @lru_cache()
     def application_json_price(self):
         if self.application_json:
             prices = self._json_extract(self.application_json, "price")
@@ -95,10 +101,12 @@ class EzProduct(EzSoup):
             return price
 
     @property
+    @lru_cache()
     def meta_price(self):
         return self.helper.meta_content("property", "product:price:amount")
 
     @property
+    @lru_cache()
     def price(self):
         soup_possible_price, unit = self.price_number_unit
         price = self.meta_price or self.application_json_price or soup_possible_price
@@ -107,17 +115,21 @@ class EzProduct(EzSoup):
         return f"{price} {unit}"
 
     @property
+    @lru_cache()
     def _price_regex(self):
         string = "\d{1,3}(?:[.,/]\d+)*(?:[.,/]\d+)"
         return re.compile(string, re.UNICODE)
 
     @property
+    @lru_cache()
     def _phone_number_regex(self):
         string = "(\d{2,4}-\d{3,}|[09]\d{7,})"
         return re.compile(string, re.UNICODE)
 
     @property
+    @lru_cache()
     def price_number_unit(self):
+        _none = (None , None)
         helper = self.helper
         resources = helper.all_contains("class", "price") + helper.all_contains(
             "id", "price"
@@ -131,9 +143,12 @@ class EzProduct(EzSoup):
                 return 0
             return len(re.findall(self._price_regex, unidecode(t.text)))
 
-        tag_with_price_format = sorted(
+        sorted_for_price = sorted(
             resources, key=lambda t: _price_tag_criterion(t)
-        )[-1]
+        )
+        if not sorted_for_price : 
+            return _none
+        tag_with_price_format = sorted_for_price[-1]
         text = tag_with_price_format.get_text(strip=True)
 
         # tp = self._tag_obj(tag_with_price_format)
@@ -156,9 +171,10 @@ class EzProduct(EzSoup):
                     raise Exception(f"No price format found in text:\n{text}\n{tp}")
 
                 return numbers[-1], unit
-        return None, None
+        return _none
 
     @property
+    @lru_cache()
     def provider_info(self):
         return {
             "name": self.site_name,
@@ -169,27 +185,12 @@ class EzProduct(EzSoup):
         }
 
     @property
+    @lru_cache()
     def address(self):
-        h = self.helper
-        tags = (
-            h.all_contains("class", "address", parent_tag_name="footer")
-            + h.all_contains("class", "location", parent_tag_name="footer")
-            + h.all("address")
-        )
-
-        if not tags:
-            footer = h.all("footer")[-1]
-            words = ["شعبه", "پلاک", "خیابان", "بلوار", "میدان"]
-            for w in words:
-                search = footer.select(f'*:-soup-contains("{w}")')
-                if search:
-                    tags.extend(search)
-                    break
-
-        texts = list({t.text.strip().replace("\n", "") for t in tags if t.text})
-        return texts[0] if texts else None
+        return self.helper.address
 
     @property
+    @lru_cache()
     def phones(self):
         tags = self.helper.all_contains("class", "phone", parent_tag_name="footer")
 
@@ -208,10 +209,12 @@ class EzProduct(EzSoup):
         return list(set(numbers))
 
     @property
+    @lru_cache()
     def image(self):
         return self.images[0]
 
     @property
+    @lru_cache()
     def images(self):
         els = self.helper.all_contains("class", "gallery")
         imgs = []
@@ -222,15 +225,18 @@ class EzProduct(EzSoup):
         return self._ok_images(imgs or self.card.find_all("img"))
 
     @property
+    @lru_cache()
     def images_src(self):
         srcs = {self._img_src(i) for i in self.images}
         return list(srcs)
 
     @property
+    @lru_cache()
     def specs(self):
         return self._spec_text_to_json(self.main_text)
 
     @property
+    @lru_cache()
     def card(self) -> Union[Tag, None]:
         class_p = self.helper.all_contains("class", "product")
         id_p = self.helper.all_contains("id", "product")
@@ -258,6 +264,7 @@ class EzProduct(EzSoup):
         return most_content_product_el
 
     @property
+    @lru_cache()
     def summary_obj(self):
         # with open("card.txt" , "w" , encoding="utf-8") as f :
         #     f.write(str(self.main_text))

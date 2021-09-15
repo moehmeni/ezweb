@@ -4,38 +4,41 @@ from typing import List, Union
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from unidecode import unidecode
+from functools import lru_cache
 
-from ezweb.utils.text import clean_title, similarity_of
+from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
 class EzSoupHelper:
-    def __init__(self, soup: BeautifulSoup , url : str) -> None:
+    def __init__(self, soup: BeautifulSoup, url: str) -> None:
         self.soup = soup
         self.url = url
 
     @property
+    @lru_cache()
     def site_name(self):
         og_site_name = self.meta_og_content("site_name")
         twitter_meta = self.meta_content("name", "twitter:creator")
-        
+
         # also nav > image `alt` can be the site title !
         nav = self.first("nav")
         nav_img = nav.find("img", {"alt": True}) if nav else None
         nav_img_alt = nav_img["alt"] if nav_img else None
         # check nav > img : alt similarity with domain root name
-        if nav_img_alt :
+        if nav_img_alt:
             # for non ascii chars
             unicoded = unidecode(nav_img_alt)
             domain_name = name_from_url(self.url)
-            if not similarity_of(unicoded , domain_name) >= 15 :
+            if not similarity_of(unicoded, domain_name) >= 15:
                 # not reliable img alt
                 nav_img_alt = None
 
         text = og_site_name or twitter_meta or nav_img_alt
-                
+
         return clean_title(text)
 
     @property
+    @lru_cache()
     def possible_topic_tags(self) -> List[Tag]:
         """
         returns possible topic/breadcrump tags of webpage
@@ -72,6 +75,7 @@ class EzSoupHelper:
         return tags
 
     @property
+    @lru_cache()
     def possible_topic_names(self):
 
         result = []
@@ -81,6 +85,56 @@ class EzSoupHelper:
                 result.append(text)
 
         return list(set(result))
+
+    @property
+    @lru_cache()
+    def address(self):
+        classes = ["address", "location", "contact"]
+        words = [
+            "آدرس",
+            "نشانی",
+            "شعبه",
+            "خیابان",
+            "کوچه",
+            "پلاک",
+            "بلوار",
+            "میدان",
+            "چهارراه",
+            "طبقه",
+            "تفاطع",
+        ]
+        #
+        def _texts_of(tags):
+            return list({clean_text(t.text) for t in tags if t.text})
+
+        ad_tags = self.all("address")
+        if ad_tags:
+            texts = _texts_of(ad_tags)
+            if texts:
+                return texts[0]
+
+        def _f(class_name):
+            """Returns all `class_name` like tags in the footer"""
+            return self.all_contains("class", class_name, "footer")
+
+        tags = []
+        for c in classes:
+            tags.extend(_f(c))
+
+        if tags:
+            texts = _texts_of(tags)
+            return texts[0] if texts else None
+
+        else:
+            # searching
+            footer = self.all("footer")[-1]
+            if not footer:
+                return None
+            for w in words:
+                search = footer.find_all(text=True)
+                texts = list({clean_text(text) for text in search if w in text})
+                if texts:
+                    return texts[0]
 
     def all(self, tag_name: str, **kwargs) -> Union[List[Tag], None]:
         return self.soup.find_all(tag_name, **kwargs)
@@ -169,10 +223,15 @@ class EzSoupHelper:
                 last = n.split("-")[-1]
                 if len(first) > len(last):
                     # it has reversed wrong (RTL langs)
-                    c.append("".join([last , first]))
+                    c.append("".join([last, first]))
                     break
             c.append(n)
         return c
+
+    def tag_text(self, t: Tag):
+        if not t or not t.text:
+            return None
+        return clean_text(t.text)
 
     @staticmethod
     def absolute_href_of(a_tag: Tag, root_url: str) -> str:
