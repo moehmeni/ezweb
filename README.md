@@ -4,7 +4,7 @@
 ## Installation
 With GitHub (latest release and recommended)
 ```
-pip install https://github.com/mdmomeni/ezweb/raw/main/dist/ezweb-0.1.3-py3-none-any.whl
+pip install https://github.com/mdmomeni/ezweb/raw/main/dist/ezweb-0.2.0-py3-none-any.whl
 ```
 Or
 ```
