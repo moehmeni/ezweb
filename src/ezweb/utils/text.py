@@ -19,3 +19,9 @@ def clean_title(string : str):
     result = string
     if result == "" : return None
     return result
+
+def clean_text(string: str):
+    text = string.strip().replace("\n", "").replace("\r", "").replace("\t", "")
+    if text == "":
+        return None
+    return text
