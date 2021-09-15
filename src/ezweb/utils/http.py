@@ -3,16 +3,24 @@ from pathlib import PurePosixPath
 from typing import Union
 from bs4 import BeautifulSoup, FeatureNotFound
 from urllib.parse import unquote, urlparse
+import os
 
+
+def cls():
+    os.system("cls" if os.name == "nt" else "clear")
 
 def safe_get(url: str) -> requests.Response:
-    print(f"Requesting {url}\n")
+    cls()
+    print(f"Requesting {url}\n" , end="\r")
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
+    }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
+    cls()
+    t = round(response.elapsed.total_seconds() , 3)
+    print(f"> Request finished : {t} seconds")
     return response
-
 
 def soup_from_url(url: str) -> BeautifulSoup:
     response = safe_get(url)
@@ -64,8 +72,14 @@ def pure_url(url: str):
     return pure.parts
 
 
+def url_host(url: str):
+    return urlparse(url).hostname
+
+
 def name_from_url(url: str):
-    root = urlparse(url).hostname
+    root = url_host(url)
+    if not root:
+        return None
     dot_splited = root.split(".")
     name = dot_splited[1] if "www" in root else dot_splited[0]
     return name.capitalize()
