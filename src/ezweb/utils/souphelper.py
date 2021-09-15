@@ -76,6 +76,20 @@ class EzSoupHelper:
 
     @property
     @lru_cache()
+    def table_info(self):
+        t = self.first("table")
+        data = [
+            {
+                self.tag_text(head): self.tag_text(cell)
+                for cell in row.find_all("td")
+                for head in row.find_all("th")
+            }
+            for row in t.find_all("tr")
+        ]
+        return data
+
+    @property
+    @lru_cache()
     def possible_topic_names(self):
 
         result = []

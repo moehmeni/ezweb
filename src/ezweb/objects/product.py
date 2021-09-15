@@ -129,7 +129,7 @@ class EzProduct(EzSoup):
     @property
     @lru_cache()
     def price_number_unit(self):
-        _none = (None , None)
+        _none = (None, None)
         helper = self.helper
         resources = helper.all_contains("class", "price") + helper.all_contains(
             "id", "price"
@@ -143,10 +143,8 @@ class EzProduct(EzSoup):
                 return 0
             return len(re.findall(self._price_regex, unidecode(t.text)))
 
-        sorted_for_price = sorted(
-            resources, key=lambda t: _price_tag_criterion(t)
-        )
-        if not sorted_for_price : 
+        sorted_for_price = sorted(resources, key=lambda t: _price_tag_criterion(t))
+        if not sorted_for_price:
             return _none
         tag_with_price_format = sorted_for_price[-1]
         text = tag_with_price_format.get_text(strip=True)
@@ -232,7 +230,7 @@ class EzProduct(EzSoup):
 
     @property
     @lru_cache()
-    def specs(self):
+    def specs_from_text(self):
         return self._spec_text_to_json(self.main_text)
 
     @property
@@ -265,19 +263,21 @@ class EzProduct(EzSoup):
 
     @property
     @lru_cache()
+    def specs(self):
+        return self.specs_from_text + self.helper.table_info
+
+    @property
+    @lru_cache()
     def summary_obj(self):
-        # with open("card.txt" , "w" , encoding="utf-8") as f :
-        #     f.write(str(self.main_text))
-        # main_text = self.main_text
         obj = {
-            # "card": self._tag_obj(self.card),
             "provider": self.provider_info,
             "title": self.title,
             "second_title": self.second_title,
             "price": self.price,
             "images": self.images_src,
-            # "main_text" : main_text ,
             "specs": self.specs,
+            # "card": self._tag_obj(self.card),
+            # "main_text" : main_text ,
         }
         return obj
 
@@ -336,6 +336,9 @@ class EzProduct(EzSoup):
 
         for _tuple in matched:
             key, value = _tuple
+
+            if len(key) > 35:  # a long key isn't a good specification
+                break
             key = key.replace("-", "").strip()
             d = {key: value}
             result.append(d)
