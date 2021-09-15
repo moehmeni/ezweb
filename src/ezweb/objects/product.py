@@ -34,8 +34,8 @@ class EzProduct(EzSoup):
     @lru_cache()
     def second_title(self):
         json_title = self._json_extract(self.application_json, "alternateName")
-        if json_title and isinstance(json_title , str):
-            return clean_title(json_title , self.site_name)
+        if json_title and isinstance(json_title, str):
+            return clean_title(json_title, self.site_name)
         h1 = self.card.find("h1")
         els = [self.card.find("h2")] + (h1.find_all() if h1 else [])
         els = [i for i in els if i is not None]
@@ -66,7 +66,7 @@ class EzProduct(EzSoup):
         if not el:
             return None
 
-        result = clean_title(el.text , self.site_name)
+        result = clean_title(el.text, self.site_name)
         # check sim again since even the sorted list el can be a bad value
         sim = similarity_of(result, title)
         if sim > 95 or sim < 49:
@@ -107,12 +107,32 @@ class EzProduct(EzSoup):
 
     @property
     @lru_cache()
-    def price(self):
+    def price_number(self):
         soup_possible_price, unit = self.price_number_unit
         price = self.meta_price or self.application_json_price or soup_possible_price
-        if price is None or unit is None:
+        if not price:
             return None
-        return f"{price} {unit}"
+        return int(price)
+
+    @property
+    @lru_cache()
+    def price_unit(self):
+        return self.price_number_unit[1]
+
+    @property
+    @lru_cache()
+    def price_number_humanize(self):
+        return "{:20,.0f}".format(self.price_number).strip()
+
+    @property
+    @lru_cache()
+    def price(self):
+        return {
+            "number": self.price_number,
+            "unit": self.price_unit,
+            "number_humanize": self.price_number_humanize,
+            "humanize": self.price_number_humanize + " " + self.price_unit,
+        }
 
     @property
     @lru_cache()
