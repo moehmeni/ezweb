@@ -20,7 +20,7 @@ class EzSoup:
         self.soup = soup_of(self.content)
         self.url = url
         self.helper = EzSoupHelper(self.soup , self.url)
-
+        
     @staticmethod
     def from_url(url: str):
         return EzSoup(safe_get(url).text, url=url)
@@ -33,7 +33,7 @@ class EzSoup:
     @property
     @lru_cache()
     def root_domain(self):
-        return url_host(self.url)
+        return url_host(self.url).replace("www." , "")
 
     @property
     @lru_cache()
@@ -41,7 +41,7 @@ class EzSoup:
         tag = self.helper.first("title")
         if not tag:
             return None
-        return clean_title(tag.text)
+        return clean_title(tag.text ,self.site_name)
 
     @property
     @lru_cache()
@@ -227,7 +227,7 @@ class EzSoup:
         headers = h1s or h2s
         page_title = self.title_tag_text
         for header in headers:
-            header_tag_text = clean_title(header.text)
+            header_tag_text = clean_title(header.text , self.site_name)
             if header_tag_text is not None:
                 # getting the similarity of h1 and original title
                 # using `rapidfuzz` library (fuzz.ratio)
@@ -239,7 +239,7 @@ class EzSoup:
             # print("title from page title tag or finally host name")
             _result = page_title or self.site_name_from_host
 
-        return clean_title(_result)
+        return clean_title(_result , self.site_name)
 
     @property
     @lru_cache()
