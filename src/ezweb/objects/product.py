@@ -12,7 +12,8 @@ from ezweb.utils.text import clean_title, similarity_of
 
 class EzProduct(EzSoup):
     def __init__(self, url: str) -> None:
-        super().__init__(str(soup_from_url(url)))
+        soup = str(soup_from_url(url))
+        super().__init__(soup , url=url)
         self.url = url
         self._main_text_container = None
 
@@ -78,6 +79,7 @@ class EzProduct(EzSoup):
     @lru_cache()
     def application_json(self):
         all_json_tags = self.helper.all("script", attrs={"type": "application/ld+json"})
+        if not all_json_tags : return None
         tag = sorted(
             all_json_tags, key=lambda t: len(t.contents[0] if t.contents else [])
         )[-1]
@@ -112,6 +114,7 @@ class EzProduct(EzSoup):
         price = self.meta_price or self.application_json_price or soup_possible_price
         if not price:
             return None
+        price = ''.join(e for e in unidecode(price) if e.isdigit())
         return int(price)
 
     @property
@@ -245,7 +248,7 @@ class EzProduct(EzSoup):
     @property
     @lru_cache()
     def images_src(self):
-        srcs = {self._img_src(i) for i in self.images}
+        srcs = {self.helper.absolute_href_of(i) for i in self.images}
         return list(srcs)
 
     @property
@@ -301,12 +304,9 @@ class EzProduct(EzSoup):
         }
         return obj
 
-    def _img_src(self, img: Tag):
-        return img.get("src", img.get("data-src", None))
-
     def _ok_images(self, images: List[Tag]):
         def _ok(i: Tag):
-            src = self._img_src(i)
+            src = self.helper.absolute_href_of(i)
             return src and ("jpg" in src or "png" in src)
 
         return [i for i in images if _ok(i)]

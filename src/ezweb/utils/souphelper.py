@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from ezweb.utils.http import name_from_url
 import re
 from typing import List, Union
@@ -252,15 +253,17 @@ class EzSoupHelper:
             return None
         return clean_text(t.text)
 
-    @staticmethod
-    def absolute_href_of(a_tag: Tag, root_url: str) -> str:
-        if not isinstance(a_tag, Tag):
-            raise TypeError(
-                f"First argument has to be a Tag instance , [{str(a_tag)}] is {str(type(a_tag))}"
-            )
-        if a_tag is None:
+    def absolute_href_of(self, source: Union[str, Tag]) -> str:
+        if not source:
             return
-        href = a_tag["href"]
-        if "http" in href:
-            return href
-        return root_url + href
+        link = None
+        if isinstance(source, Tag):
+            if source.name in ["a", "link"] and not ("http" in source):
+                link = source.get("href")
+            else:
+                link = source.get("src", source.get("data-src"))
+                
+        if not link : return
+        root = "https://" + urlparse(self.url).netloc
+        result = root + link
+        return result

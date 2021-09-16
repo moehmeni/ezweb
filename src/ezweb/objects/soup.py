@@ -299,9 +299,9 @@ class EzSoup:
         links_container = []
         url_part_count_container = []
         for a in self.important_a_tags:
-            if a.get("href", None):
+            if a.get("href"):
                 # check if first part is in important routes then count it also.
-                link = self.helper.absolute_href_of(a, self.url)
+                link = self.helper.absolute_href_of(a)
                 parts = pure_url(link)
                 parts_count = len(parts)
                 just_one_route = parts_count == 2
