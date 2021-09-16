@@ -11,21 +11,22 @@ def list_counter(items: list) -> list:
     return result
 
 def clean_title(string : str , site_name : str = None):
-    assert isinstance(string  , str) , string
     if not string : return None
-    bads = ["-", "|", ",", "،"]
-    if site_name:
-        bads.append(site_name)
-    result = string.strip().replace("\n", "")
-    for w in bads:
-        string = string.replace(w, "")
-    result = string.replace("  " , "").strip()
-    if result == "" : return None
-    return result
+    if isinstance(string , str):
+        bads = ["-", "|", ",", "،"]
+        if site_name:
+            bads.append(site_name)
+        result = string.strip().replace("\n", "")
+        for w in bads:
+            string = string.replace(w, "")
+        result = string.replace("  " , "").strip()
+        if result == "" : return None
+        return result
 
 def clean_text(string: str):
-    assert isinstance(string  , str) , string
-    text = string.strip().replace("\n", "").replace("\r", "").replace("\t", "")
-    if text == "":
-        return None
-    return text
+    if not string : return None
+    if isinstance(string , str):
+        text = string.strip().replace("\n", "").replace("\r", "").replace("\t", "")
+        if text == "":
+            return None
+        return text
