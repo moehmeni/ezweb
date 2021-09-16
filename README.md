@@ -5,10 +5,6 @@
 ```
 pip install ezweb
 ```
-Or
-```
-pip install https://github.com/mdmomeni/ezweb/raw/main/dist/ezweb-0.2.0-py3-none-any.whl
-```
 ## Basic Usage
 ```python
 from ezweb import EzSoup
