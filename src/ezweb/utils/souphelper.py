@@ -253,7 +253,9 @@ class EzSoupHelper:
             return None
         return clean_text(t.text)
 
-    def absolute_href_of(self, source: Union[str, Tag]) -> str:
+    def absolute_href_of(
+        self, source: Union[str, Tag], should_be_internal=False
+    ) -> str:
         if not source:
             return
         link = None
@@ -262,8 +264,25 @@ class EzSoupHelper:
                 link = source.get("href")
             else:
                 link = source.get("src", source.get("data-src"))
-                
-        if not link : return
-        root = "https://" + urlparse(self.url).netloc
-        result = root + link
+
+        if not link:
+            return
+
+        root_domain = urlparse(self.url).netloc.replace("www.", "")
+        root = "https://" + root_domain
+        result = None
+        if "http" in link:
+            result = link
+            if should_be_internal:
+                # the link is not internal and is for another website
+                link_domain = urlparse(link).netloc.replace("www.", "")
+                is_internal = link_domain == root_domain
+                if not is_internal:
+                    return None
+        else:
+            if link[0] != "/":
+                # hashtags or ?&
+                return None
+            result = root + link
+
         return result
