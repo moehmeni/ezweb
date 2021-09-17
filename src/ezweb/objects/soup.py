@@ -27,6 +27,12 @@ class EzSoup:
 
     @property
     @lru_cache()
+    def url_parts(self):
+        if self.url :
+            return pure_url(self.url)
+    
+    @property
+    @lru_cache()
     def site_name_from_host(self):
         return name_from_url(self.url)
 
@@ -321,7 +327,7 @@ class EzSoup:
                 link = self.helper.absolute_href_of(a)
                 if not link:
                     continue
-                parts = pure_url(link)
+                parts = self.url_parts
                 parts_count = len(parts)
                 just_one_route = parts_count == 2
                 if "/#" in link:
