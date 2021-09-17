@@ -1,3 +1,4 @@
+import json
 from urllib.parse import urlparse
 from ezweb.utils.http import name_from_url
 import re
@@ -222,6 +223,58 @@ class EzSoupHelper:
         # merge all d values list into one list of str
         result = list(itertools.chain.from_iterable(vocab.values()))
         return result
+    
+    @property
+    @lru_cache()
+    def application_json(self):
+        all_json_tags = self.all("script", attrs={"type": "application/ld+json"})
+        if not all_json_tags:
+            return None
+        tag = sorted(
+            all_json_tags, key=lambda t: len(t.contents[0] if t.contents else [])
+        )[-1]
+        string = tag.contents[0] if tag.contents else None
+        result = json.loads(string) if string and string != "" else None
+        return result
+    
+    def from_structured_data(self , key : str):
+        """
+        https://developers.google.com/search/docs/advanced/structured-data/
+        """
+        from_json_ld = self.from_json_schema(key)
+        # TODO: providing other structured schemas like
+        # RDFa and Microdata
+        return from_json_ld
+        
+    def from_json_schema(self , key : str):
+        """
+        returns a list of the values of `key` param if 
+        page schema exists and 
+        the `key` exists in the page schema
+        page schema can be application json tag
+        """
+        json_ld = self._json_extract(self.application_json, key)
+        return json_ld
+    
+    def _json_extract(self, obj, key):
+        """Recursively fetch values from nested JSON."""
+        arr = []
+
+        def extract(obj, arr, key):
+            """Recursively search for values of key in JSON tree."""
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if isinstance(v, (dict, list)):
+                        extract(v, arr, key)
+                    elif k == key:
+                        arr.append(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    extract(item, arr, key)
+            return arr
+        values = extract(obj, arr, key)
+        
+        return values
     
     def _ok_topic_name(self, name: str):
         reason = None
