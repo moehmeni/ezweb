@@ -13,7 +13,7 @@ from ezweb.utils.text import clean_title, similarity_of
 class EzProduct(EzSoup):
     def __init__(self, url: str) -> None:
         soup = str(soup_from_url(url))
-        super().__init__(soup , url=url)
+        super().__init__(soup, url=url)
         self.url = url
         self._main_text_container = None
 
@@ -21,6 +21,44 @@ class EzProduct(EzSoup):
     @lru_cache()
     def units(self):
         return ["تومان", "ریال", "$"]
+
+    @property
+    @lru_cache()
+    def possibility(self):
+        max_p = 1.0
+        min_p = 0.0
+        p = 0.0
+        if self.specs:
+            p += 0.1
+            sl = len(self.specs)
+            if sl > 3:
+                p += 0.2
+            elif sl > 7:
+                p += 0.35
+        if self.images_src and len(self.images_src) > 3:
+            p += 0.15
+        if self.price_number:
+            p += 0.2
+        up1 = self.url_parts[1]
+        up2 = self.url_parts[2]
+        if up1 and up1.lower() == "product":
+            p += 0.6
+        if up2 and up2.lower() == "product":
+            p += 0.6
+        if self.second_title:
+            p += 0.35
+        if "Product" in self.helper.from_structured_data("@type"):
+            p += 0.75
+        if p > max_p:
+            p = max_p
+        if p < min_p:
+            p = min_p
+        return float(p)
+
+    @property
+    @lru_cache()
+    def is_product(self):
+        return self.possibility >= 0.75
 
     @property
     @lru_cache()
@@ -34,9 +72,9 @@ class EzProduct(EzSoup):
     @property
     @lru_cache()
     def second_title(self):
-        json_title = self._json_extract(self.application_json, "alternateName")
-        if json_title and isinstance(json_title, str):
-            return clean_title(json_title, self.site_name)
+        sc_title = self.helper.from_structured_data("alternateName")
+        if sc_title and isinstance(sc_title, str):
+            return clean_title(sc_title, self.site_name)
         h1 = self.card.find("h1")
         els = [self.card.find("h2")] + (h1.find_all() if h1 else [])
         els = [i for i in els if i is not None]
@@ -77,30 +115,17 @@ class EzProduct(EzSoup):
 
     @property
     @lru_cache()
-    def application_json(self):
-        all_json_tags = self.helper.all("script", attrs={"type": "application/ld+json"})
-        if not all_json_tags : return None
-        tag = sorted(
-            all_json_tags, key=lambda t: len(t.contents[0] if t.contents else [])
-        )[-1]
-        string = tag.contents[0] if tag.contents else None
-        result = json.loads(string) if string and string != "" else None
-        return result
-
-    @property
-    @lru_cache()
-    def application_json_price(self):
-        if self.application_json:
-            prices = self._json_extract(self.application_json, "price")
-            if not prices:
-                return None
-            price = 0
-            for p in sorted(prices):
-                if p and float(p) != 0:
-                    price = p
-                    break
-            # print(f"-----\n Json price : {price} \n-----")
-            return price
+    def structured_price(self):
+        prices = self.helper.from_structured_data("price")
+        if not prices:
+            return
+        price = 0
+        for p in sorted(prices):
+            if p and float(p) != 0:
+                price = p
+                break
+        # print(f"-----\n Json price : {price} \n-----")
+        return price
 
     @property
     @lru_cache()
@@ -111,10 +136,10 @@ class EzProduct(EzSoup):
     @lru_cache()
     def price_number(self):
         soup_possible_price, unit = self.price_number_unit
-        price = self.meta_price or self.application_json_price or soup_possible_price
+        price = self.meta_price or self.structured_price or soup_possible_price
         if not price:
             return None
-        price = ''.join(e for e in unidecode(price) if e.isdigit())
+        price = "".join(e for e in unidecode(str(price)) if e.isdigit())
         return int(price)
 
     @property
@@ -134,7 +159,7 @@ class EzProduct(EzSoup):
             "number": self.price_number,
             "unit": self.price_unit,
             "number_humanize": self.price_number_humanize,
-            "humanize": self.price_number_humanize + " " + self.price_unit,
+            "humanize": f"{self.price_number_humanize} {self.price_unit}",
         }
 
     @property
@@ -243,7 +268,12 @@ class EzProduct(EzSoup):
             if el.name == "img":
                 imgs.append(el)
             imgs.extend(el.find_all("img"))
-        return self._ok_images(imgs or self.card.find_all("img"))
+        images = (
+            self.helper.from_structured_data("image")
+            or imgs
+            or self.card.find_all("img")
+        )
+        return self._ok_images(images)
 
     @property
     @lru_cache()
@@ -299,7 +329,7 @@ class EzProduct(EzSoup):
             "price": self.price,
             "images": self.images_src,
             "specs": self.specs,
-            "possible_topics" : self.possible_topic_names
+            "possible_topics": self.possible_topic_names
             # "links" : self.a_tag_hrefs_internal
             # "card": self._tag_obj(self.card),
             # "main_text" : main_text ,
@@ -315,26 +345,6 @@ class EzProduct(EzSoup):
 
     def _tag_obj(self, t: Tag):
         return {"tag": t.name, "class": t.get("class", None), "id": t.get("id", None)}
-
-    def _json_extract(self, obj, key):
-        """Recursively fetch values from nested JSON."""
-        arr = []
-
-        def extract(obj, arr, key):
-            """Recursively search for values of key in JSON tree."""
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    if isinstance(v, (dict, list)):
-                        extract(v, arr, key)
-                    elif k == key:
-                        arr.append(v)
-            elif isinstance(obj, list):
-                for item in obj:
-                    extract(item, arr, key)
-            return arr
-
-        values = extract(obj, arr, key)
-        return values
 
     def _spec_text_to_json(self, text: str):
         if not text:
