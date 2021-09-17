@@ -68,7 +68,9 @@ def url_spliter(url: str, root: bool = False) -> list:
 
 
 def pure_url(url: str):
-    pure = PurePosixPath(unquote(urlparse(url).path))
+    parsed = urlparse(url).path
+    unquoted = unquote(parsed)
+    pure = PurePosixPath(unquoted)
     return pure.parts
 
 
