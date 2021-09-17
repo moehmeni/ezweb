@@ -299,6 +299,7 @@ class EzProduct(EzSoup):
             "price": self.price,
             "images": self.images_src,
             "specs": self.specs,
+            "possible_topics" : self.possible_topic_names
             # "links" : self.a_tag_hrefs_internal
             # "card": self._tag_obj(self.card),
             # "main_text" : main_text ,

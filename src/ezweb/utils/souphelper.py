@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 from unidecode import unidecode
 from functools import lru_cache
-
+import itertools
 from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
@@ -102,7 +102,7 @@ class EzSoupHelper:
         for tag in self.possible_topic_tags:
             text = tag.get_text(strip=True)
             if self._ok_topic_name(text):
-                result.append(text)
+                result.append(text.capitalize())
 
         return list(set(result))
 
@@ -212,10 +212,24 @@ class EzSoupHelper:
         """
         return self.contains("a", "href", f".{extension}")
 
+    @property
+    @lru_cache()
+    def _bad_topic_names(self):
+        vocab = {
+            "fa" : ["فروشگاه"  , "خانه" , "صفحه اصلی" , "برگشت" ,"بازگشت"] ,
+            "en" : ["home" , "return" , "back" , "undo" , "shop"]
+        }
+        # merge all d values list into one list of str
+        result = list(itertools.chain.from_iterable(vocab.values()))
+        return result
+    
     def _ok_topic_name(self, name: str):
         reason = None
+        name = name.lower()
         if not name or name == "" or len(name) > 26:
             # print("Null topic name or many charachters")
+            return False
+        if name in self._bad_topic_names :
             return False
         site_name = self.site_name
         msg = f"| name : {name} , site name : {site_name}"

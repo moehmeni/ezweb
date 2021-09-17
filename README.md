@@ -34,7 +34,6 @@ Output :
     [
         "Mobile Phones",
         "Reviews",
-        "Home"
     ]
 }
 ```
