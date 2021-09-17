@@ -1,7 +1,8 @@
-dist_test
+dist_test/
+test/
 twine.bat
 *.html
-test/
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
