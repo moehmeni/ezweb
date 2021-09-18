@@ -5,7 +5,7 @@ from dateutil.parser import parse as date_parse
 from trafilatura import extract
 from readability import Document
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
+from cached_property import cached_property
 
 #
 from ezweb.utils.http import safe_get, soup_of, pure_url, name_from_url, url_host
@@ -25,37 +25,31 @@ class EzSoup:
     def from_url(url: str):
         return EzSoup(safe_get(url).text, url=url)
 
-    @property
-    @lru_cache()
+    @cached_property
     def url_parts(self):
-        if self.url :
+        if self.url:
             return pure_url(self.url)
-    
-    @property
-    @lru_cache()
+
+    @cached_property
     def site_name_from_host(self):
         return name_from_url(self.url)
 
-    @property
-    @lru_cache()
+    @cached_property
     def root_domain(self):
         return url_host(self.url).replace("www.", "")
 
-    @property
-    @lru_cache()
+    @cached_property
     def title_tag_text(self):
         tag = self.helper.first("title")
         if not tag:
             return None
         return clean_title(tag.text, self.site_name)
 
-    @property
-    @lru_cache()
+    @cached_property
     def text(self):
         return self.soup.get_text(separator="\n", strip=True)
 
-    @property
-    @lru_cache()
+    @cached_property
     def main_text(self):
         result = extract(
             self.content,
@@ -63,31 +57,26 @@ class EzSoup:
         )
         return result
 
-    @property
-    @lru_cache()
+    @cached_property
     def main_html(self):
         doc = Document(self.content)
         return doc.summary()
 
-    @property
-    @lru_cache()
+    @cached_property
     def site_name(self):
         return self.helper.site_name or self.site_name_from_host
 
-    @property
-    @lru_cache()
+    @cached_property
     def meta_description(self):
         normal = self.helper.meta_content("name", "description")
         og = self.helper.meta_og_content("description")
         return normal or og
 
-    @property
-    @lru_cache()
+    @cached_property
     def meta_image_src(self):
         return self.helper.meta_og_content("image")
 
-    @property
-    @lru_cache()
+    @cached_property
     def meta_article_published_time(self):
         try:
             time = self.helper.meta_content("property", "article:published_time")
@@ -95,8 +84,7 @@ class EzSoup:
         except Exception as e:
             return None
 
-    @property
-    @lru_cache()
+    @cached_property
     def meta_article_modified_time(self):
         try:
             time = self.helper.meta_content("property", "article:modified_time")
@@ -104,13 +92,11 @@ class EzSoup:
         except Exception as e:
             return None
 
-    @property
-    @lru_cache()
+    @cached_property
     def main_image_src(self):
         return self.meta_image_src or self.article_tag_image_src
 
-    @property
-    @lru_cache()
+    @cached_property
     def article_tag(self):
         """
         returns an article tag which has the most text length
@@ -120,8 +106,7 @@ class EzSoup:
             return None
         return sorted(articles, key=lambda tag: len(tag.text))[-1]
 
-    @property
-    @lru_cache()
+    @cached_property
     def article_tag_image(self):
         """
         returns the image which has the most similarity
@@ -132,26 +117,22 @@ class EzSoup:
             return None
         return images[0]
 
-    @property
-    @lru_cache()
+    @cached_property
     def article_tag_image_src(self):
         image = self.article_tag_image
         if not image:
             return None
         return image.get("src", None)
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tags_with_href(self):
         return self.helper.all("a", href=True)
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tag_texts(self):
         return list({a.text for a in self.helper.all("a") if a.text})
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tag_hrefs(self):
         return [
             x
@@ -161,8 +142,7 @@ class EzSoup:
             if x
         ]
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tag_hrefs_internal(self):
         return [
             x
@@ -172,18 +152,15 @@ class EzSoup:
             if x
         ]
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tags_mp3(self):
         return self.helper.linked_files("mp3")
 
-    @property
-    @lru_cache()
+    @cached_property
     def a_tags_rar(self):
         return self.helper.linked_files("rar")
 
-    @property
-    @lru_cache()
+    @cached_property
     def article_tag_images(self):
         def _img_criterion(img: Tag):
             sim = similarity_of(page_title, img.get("alt", "").strip())
@@ -197,8 +174,7 @@ class EzSoup:
         images = sorted(images, key=lambda x: _img_criterion(x), reverse=True)
         return images
 
-    @property
-    @lru_cache()
+    @cached_property
     def is_article(self):
         """
         check the page is a true article page or not
@@ -213,8 +189,7 @@ class EzSoup:
             return False
         return True
 
-    @property
-    @lru_cache()
+    @cached_property
     def favicon_href(self):
         icon_links = self.helper.contains("link", "rel", "icon")
         if not icon_links:
@@ -235,8 +210,7 @@ class EzSoup:
 
         return biggest_icon_link_tag.get("href", None)
 
-    @property
-    @lru_cache()
+    @cached_property
     def title(self):
         """
         usually the `<h1>` tag content of a web page
@@ -264,13 +238,11 @@ class EzSoup:
 
         return clean_title(_result, self.site_name)
 
-    @property
-    @lru_cache()
+    @cached_property
     def _not_important_routes(self):
         return ["search", "cart", "faq", "about-us", "terms", "landings"]
 
-    @property
-    @lru_cache()
+    @cached_property
     def important_a_tags(self):
         """
         returns `a` tags that includes header (h2, h3) inside
@@ -316,8 +288,7 @@ class EzSoup:
 
         return results
 
-    @property
-    @lru_cache()
+    @cached_property
     def important_hrefs(self):
         links_container = []
         url_part_count_container = []
@@ -362,8 +333,7 @@ class EzSoup:
 
         return result
 
-    @property
-    @lru_cache()
+    @cached_property
     def possible_topic_names(self):
         """
         returns possible topic/breadcrump names of webpage
@@ -371,8 +341,7 @@ class EzSoup:
         """
         return self.helper.possible_topic_names
 
-    @property
-    @lru_cache()
+    @cached_property
     def summary_dict(self):
         obj = {
             "title": self.title,
@@ -385,13 +354,11 @@ class EzSoup:
             obj = {**{"url": self.url}, **obj}
         return obj
 
-    @property
-    @lru_cache()
+    @cached_property
     def json_summary(self):
         return json.dumps(self.summary_dict, indent=4, ensure_ascii=False)
 
-    @property
-    @lru_cache()
+    @cached_property
     def children(self):
         """
         returns a list of `EzSoup` instances from `self.important_hrefs`

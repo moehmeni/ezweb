@@ -5,3 +5,4 @@ python-dateutil
 rapidfuzz
 readability-lxml
 trafilatura
+cached-property

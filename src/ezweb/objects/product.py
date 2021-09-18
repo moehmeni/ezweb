@@ -1,10 +1,9 @@
 import re
 from typing import List, Union
 from bs4.element import Tag
-import json
 from trafilatura import extract
 from unidecode import unidecode
-from functools import lru_cache
+from cached_property import cached_property
 from ezweb.objects import EzSoup
 from ezweb.utils.http import soup_from_url
 from ezweb.utils.text import clean_title, similarity_of
@@ -17,13 +16,11 @@ class EzProduct(EzSoup):
         self.url = url
         self._main_text_container = None
 
-    @property
-    @lru_cache()
+    @cached_property
     def units(self):
         return ["تومان", "ریال", "$"]
 
-    @property
-    @lru_cache()
+    @cached_property
     def possibility(self):
         max_p = 1.0
         min_p = 0.0
@@ -55,13 +52,11 @@ class EzProduct(EzSoup):
             p = min_p
         return float(p)
 
-    @property
-    @lru_cache()
+    @cached_property
     def is_product(self):
         return self.possibility >= 0.75
 
-    @property
-    @lru_cache()
+    @cached_property
     def main_text(self):
         if self._main_text_container:
             return self._main_text_container
@@ -69,8 +64,11 @@ class EzProduct(EzSoup):
         self._main_text_container = result
         return result
 
-    @property
-    @lru_cache()
+    @cached_property
+    def short_description(self):
+        return self.helper.from_structured_data("description") or self.meta_description
+
+    @cached_property
     def second_title(self):
         sc_title = self.helper.from_structured_data("alternateName")
         if sc_title and isinstance(sc_title, str):
@@ -113,8 +111,7 @@ class EzProduct(EzSoup):
 
         return result
 
-    @property
-    @lru_cache()
+    @cached_property
     def structured_price(self):
         prices = self.helper.from_structured_data("price")
         if not prices:
@@ -127,13 +124,11 @@ class EzProduct(EzSoup):
         # print(f"-----\n Json price : {price} \n-----")
         return price
 
-    @property
-    @lru_cache()
+    @cached_property
     def meta_price(self):
         return self.helper.meta_content("property", "product:price:amount")
 
-    @property
-    @lru_cache()
+    @cached_property
     def price_number(self):
         soup_possible_price, unit = self.price_number_unit
         price = self.meta_price or self.structured_price or soup_possible_price
@@ -142,18 +137,15 @@ class EzProduct(EzSoup):
         price = "".join(e for e in unidecode(str(price)) if e.isdigit())
         return int(price)
 
-    @property
-    @lru_cache()
+    @cached_property
     def price_unit(self):
         return self.price_number_unit[1]
 
-    @property
-    @lru_cache()
+    @cached_property
     def price_number_humanize(self):
         return "{:20,.0f}".format(self.price_number).strip()
 
-    @property
-    @lru_cache()
+    @cached_property
     def price(self):
         return {
             "number": self.price_number,
@@ -162,20 +154,17 @@ class EzProduct(EzSoup):
             "humanize": f"{self.price_number_humanize} {self.price_unit}",
         }
 
-    @property
-    @lru_cache()
+    @cached_property
     def _price_regex(self):
         string = "\d{1,3}(?:[.,/]\d+)*(?:[.,/]\d+)"
         return re.compile(string, re.UNICODE)
 
-    @property
-    @lru_cache()
+    @cached_property
     def _phone_number_regex(self):
         string = "(\d{2,4}-\d{3,}|[09]\d{7,})"
         return re.compile(string, re.UNICODE)
 
-    @property
-    @lru_cache()
+    @cached_property
     def price_number_unit(self):
         _none = (None, None)
         helper = self.helper
@@ -219,8 +208,7 @@ class EzProduct(EzSoup):
                 return numbers[-1], unit
         return _none
 
-    @property
-    @lru_cache()
+    @cached_property
     def provider_info(self):
         return {
             "name": self.site_name,
@@ -230,13 +218,11 @@ class EzProduct(EzSoup):
             "phone": self.phones,
         }
 
-    @property
-    @lru_cache()
+    @cached_property
     def address(self):
         return self.helper.address
 
-    @property
-    @lru_cache()
+    @cached_property
     def phones(self):
         tags = self.helper.all_contains("class", "phone", parent_tag_name="footer")
 
@@ -254,13 +240,11 @@ class EzProduct(EzSoup):
 
         return list(set(numbers))
 
-    @property
-    @lru_cache()
+    @cached_property
     def image(self):
         return self.images[0]
 
-    @property
-    @lru_cache()
+    @cached_property
     def images(self):
         els = self.helper.all_contains("class", "gallery")
         imgs = []
@@ -275,19 +259,16 @@ class EzProduct(EzSoup):
         )
         return self._ok_images(images)
 
-    @property
-    @lru_cache()
+    @cached_property
     def images_src(self):
         srcs = {self.helper.absolute_href_of(i) for i in self.images}
         return list(srcs)
 
-    @property
-    @lru_cache()
+    @cached_property
     def specs_from_text(self):
         return self._spec_text_to_json(self.main_text)
 
-    @property
-    @lru_cache()
+    @cached_property
     def card(self) -> Union[Tag, None]:
         class_p = self.helper.all_contains("class", "product")
         id_p = self.helper.all_contains("id", "product")
@@ -314,13 +295,11 @@ class EzProduct(EzSoup):
         most_content_product_el = sorted(els, key=lambda t: main_card_criterion(t))[-1]
         return most_content_product_el
 
-    @property
-    @lru_cache()
+    @cached_property
     def specs(self):
         return self.specs_from_text + self.helper.table_info
 
-    @property
-    @lru_cache()
+    @cached_property
     def summary_obj(self):
         obj = {
             "provider": self.provider_info,
@@ -329,7 +308,7 @@ class EzProduct(EzSoup):
             "price": self.price,
             "images": self.images_src,
             "specs": self.specs,
-            "possible_topics": self.possible_topic_names
+            "possible_topics": self.possible_topic_names,
             # "links" : self.a_tag_hrefs_internal
             # "card": self._tag_obj(self.card),
             # "main_text" : main_text ,
@@ -366,8 +345,7 @@ class EzProduct(EzSoup):
                         values.append(w)
                 matched = list(zip(keys, values))
 
-        for _tuple in matched:
-            key, value = _tuple
+        for key, value in matched:
 
             if len(key) > 35:  # a long key isn't a good specification
                 break
