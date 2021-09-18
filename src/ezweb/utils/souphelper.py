@@ -320,6 +320,19 @@ class EzSoupHelper:
             return None
         return clean_text(t.text)
 
+    def question_answer_from_text(self, text: str):
+        regex = re.compile("(.*)[?؟](.*)")
+        matches = re.findall(regex, text)
+
+        def _ok(k, v):
+            if not k or k.strip().replace("\n", "") == "":
+                return False
+            if not v or v.strip().replace("\n", "") == "":
+                return False
+            return True
+
+        return {k.strip(): v.strip() for k, v in matches if _ok(k, v)}
+
     def absolute_href_of(
         self, source: Union[str, Tag], should_be_internal=False
     ) -> str:
