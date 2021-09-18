@@ -1,13 +1,15 @@
 import json
 from urllib.parse import urlparse
-from ezweb.utils.http import name_from_url
 import re
 from typing import List, Union
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from unidecode import unidecode
-from functools import lru_cache
+from cached_property import cached_property
 import itertools
+
+#
+from ezweb.utils.http import name_from_url
 from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
@@ -16,8 +18,7 @@ class EzSoupHelper:
         self.soup = soup
         self.url = url
 
-    @property
-    @lru_cache()
+    @cached_property
     def site_name(self):
         og_site_name = self.meta_og_content("site_name")
         twitter_meta = self.meta_content("name", "twitter:creator")
@@ -39,8 +40,7 @@ class EzSoupHelper:
 
         return clean_title(text)
 
-    @property
-    @lru_cache()
+    @cached_property
     def possible_topic_tags(self) -> List[Tag]:
         """
         returns possible topic/breadcrump tags of webpage
@@ -76,8 +76,7 @@ class EzSoupHelper:
         tags = maybe_elements + article_ul_a
         return tags
 
-    @property
-    @lru_cache()
+    @cached_property
     def table_info(self):
         t = self.first("table")
         if not t:
@@ -95,8 +94,7 @@ class EzSoupHelper:
         ]
         return data
 
-    @property
-    @lru_cache()
+    @cached_property
     def possible_topic_names(self):
 
         result = []
@@ -107,8 +105,7 @@ class EzSoupHelper:
 
         return list(set(result))
 
-    @property
-    @lru_cache()
+    @cached_property
     def address(self):
         classes = ["address", "location", "contact"]
         words = [
@@ -157,6 +154,34 @@ class EzSoupHelper:
                 if texts:
                     return texts[0]
 
+    @cached_property
+    def question_answers(self):
+        q_tags_texts = self.all_contains("class", "faq", just_text=True)
+        return [self.question_answer_from_text(t) for t in q_tags_texts]
+        # return q_tags_texts
+
+    @cached_property
+    def _bad_topic_names(self):
+        vocab = {
+            "fa": ["فروشگاه", "خانه", "صفحه اصلی", "برگشت", "بازگشت"],
+            "en": ["home", "return", "back", "undo", "shop"],
+        }
+        # merge all d values list into one list of str
+        result = list(itertools.chain.from_iterable(vocab.values()))
+        return result
+
+    @cached_property
+    def application_json(self):
+        all_json_tags = self.all("script", attrs={"type": "application/ld+json"})
+        if not all_json_tags:
+            return None
+        tag = sorted(
+            all_json_tags, key=lambda t: len(t.contents[0] if t.contents else [])
+        )[-1]
+        string = tag.contents[0] if tag.contents else None
+        result = json.loads(string) if string and string != "" else None
+        return result
+
     def all(self, tag_name: str, **kwargs) -> Union[List[Tag], None]:
         return self.soup.find_all(tag_name, **kwargs)
 
@@ -166,8 +191,13 @@ class EzSoupHelper:
     def xpath(self, pattern: str):
         return self.soup.select(pattern)
 
-    def all_contains(self, attr: str, value: str, parent_tag_name: str = "*"):
-        return self.contains(parent_tag_name, attr, value)
+    def all_contains(
+        self, attr: str, value: str, parent_tag_name: str = "*", just_text: bool = False
+    ):
+        res = self.contains(parent_tag_name, attr, value)
+        if just_text:
+            res = [self.tag_text(t) for t in res if self.tag_text(t)]
+        return res
 
     def meta(self, key: str, name: str):
         return self.first("meta", {key: name})
@@ -213,31 +243,7 @@ class EzSoupHelper:
         """
         return self.contains("a", "href", f".{extension}")
 
-    @property
-    @lru_cache()
-    def _bad_topic_names(self):
-        vocab = {
-            "fa" : ["فروشگاه"  , "خانه" , "صفحه اصلی" , "برگشت" ,"بازگشت"] ,
-            "en" : ["home" , "return" , "back" , "undo" , "shop"]
-        }
-        # merge all d values list into one list of str
-        result = list(itertools.chain.from_iterable(vocab.values()))
-        return result
-    
-    @property
-    @lru_cache()
-    def application_json(self):
-        all_json_tags = self.all("script", attrs={"type": "application/ld+json"})
-        if not all_json_tags:
-            return None
-        tag = sorted(
-            all_json_tags, key=lambda t: len(t.contents[0] if t.contents else [])
-        )[-1]
-        string = tag.contents[0] if tag.contents else None
-        result = json.loads(string) if string and string != "" else None
-        return result
-    
-    def from_structured_data(self , key : str):
+    def from_structured_data(self, key: str):
         """
         https://developers.google.com/search/docs/advanced/structured-data/
         """
@@ -245,17 +251,17 @@ class EzSoupHelper:
         # TODO: providing other structured schemas like
         # RDFa and Microdata
         return from_json_ld
-        
-    def from_json_schema(self , key : str):
+
+    def from_json_schema(self, key: str):
         """
-        returns a list of the values of `key` param if 
-        page schema exists and 
+        returns a list of the values of `key` param if
+        page schema exists and
         the `key` exists in the page schema
         page schema can be application json tag
         """
         json_ld = self._json_extract(self.application_json, key)
         return json_ld
-    
+
     def _json_extract(self, obj, key):
         """Recursively fetch values from nested JSON."""
         arr = []
@@ -272,26 +278,27 @@ class EzSoupHelper:
                 for item in obj:
                     extract(item, arr, key)
             return arr
+
         values = extract(obj, arr, key)
-        
+
         return values
-    
+
     def _ok_topic_name(self, name: str):
         reason = None
         name = name.lower()
         if not name or name == "" or len(name) > 26:
             # print("Null topic name or many charachters")
             return False
-        if name in self._bad_topic_names :
+        if name in self._bad_topic_names:
             return False
         site_name = self.site_name
         msg = f"| name : {name} , site name : {site_name}"
         if name == site_name:
-            print(f"Topic name is exactly site name {msg}")
+            # print(f"Topic name is exactly site name {msg}")
             return False
         sim = similarity_of(name, site_name)
         if sim > 65:
-            print(f"Topic name is similar with site name {msg} , similarity : {sim}")
+            # print(f"Topic name is similar with site name {msg} , similarity : {sim}")
             return False
         return True
 
