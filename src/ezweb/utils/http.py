@@ -10,14 +10,12 @@ def cls():
     os.system("cls" if os.name == "nt" else "clear")
 
 def safe_get(url: str) -> requests.Response:
-    cls()
     print(f"Requesting {url}\n" , end="\r")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-    cls()
     t = round(response.elapsed.total_seconds() , 3)
     print(f"> Request finished : {t} seconds")
     return response
