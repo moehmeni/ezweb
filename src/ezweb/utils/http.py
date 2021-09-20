@@ -20,6 +20,17 @@ def safe_get(url: str) -> requests.Response:
     print(f"> Request finished : {t} seconds")
     return response
 
+def safe_head(url: str) -> requests.Response:
+    print(f"Heading {url}\n" , end="\r")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
+    }
+    response = requests.head(url, headers=headers)
+    response.raise_for_status()
+    t = round(response.elapsed.total_seconds() , 3)
+    print(f"> Head Request finished : {t} seconds")
+    return response
+
 def soup_from_url(url: str) -> BeautifulSoup:
     response = safe_get(url)
     return soup_of(response.text)
