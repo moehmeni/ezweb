@@ -9,7 +9,7 @@ from cached_property import cached_property
 import itertools
 
 #
-from ezweb.utils.http import name_from_url
+from ezweb.utils.http import name_from_url, pure_url
 from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
@@ -46,7 +46,13 @@ class EzSoupHelper:
         returns possible topic/breadcrump tags of webpage
         generated from soup (HTML) itself .
         """
+        # get some nav
+        nav = []
+        for n in self.all("nav"):
+            if 1 > len(n.find_all("a" , href=True)) <= 4:
+                nav.append(n)
 
+                    
         id_bread = self.all_contains("id", "breadcrumb")
         class_bread = self.all_contains("class", "breadcrumb")
         breads = id_bread + class_bread
@@ -56,10 +62,21 @@ class EzSoupHelper:
         class_maybe = class_cat + class_tag
 
         # avoid using not related tags
-        if len(class_maybe) > 7:
+        if len(class_maybe) > 6:
             class_maybe = []
+            
+        # avoid using not related tags
+        for tag in breads :
+            bread_a_tags= []
+            if tag.name == "a" :
+                bread_a_tags.append(tag)
+            for a in tag.find_all("a"):
+                bread_a_tags.append(a)
+            if len(bread_a_tags) > 10 :
+                breads = []
 
-        maybe_elements_containers = breads + class_maybe
+        print("nav", len(nav), "breads", len(breads), "class_maybe", len(class_maybe))
+        maybe_elements_containers = nav + breads + class_maybe
         maybe_elements = []
 
         # filling maybe_elements with all <a> in selected parents (containers)
@@ -73,26 +90,36 @@ class EzSoupHelper:
         article_ul_tag = article.find("ul") if article else None
         article_ul_a = article_ul_tag.find_all("a") if article_ul_tag else []
 
+        print("maybe" , len(maybe_elements) , "article_ul" , len(article_ul_a))
         tags = maybe_elements + article_ul_a
         return tags
 
     @cached_property
     def table_info(self):
-        t = self.first("table")
-        if not t:
-            return []
-        rows = t.find_all("tr")
-        if not rows:
-            return []
-        data = [
-            {
-                self.tag_text(head): self.tag_text(cell)
-                for cell in row.find_all("td")
-                for head in row.find_all("th")
-            }
-            for row in rows
-        ]
-        return data
+        tables = self.all("table")
+        result = []
+        for table in tables:
+            if not table:
+                continue
+            rows = table.find_all("tr")
+            if not rows:
+                return []
+            for row in rows:
+                cells = row.find_all("td")
+                headers = row.find_all("th")
+                if not cells or not headers:
+                    break
+                for head, cell in zip(headers, cells):
+                    ht = self.tag_text(head)
+                    ct = self.tag_text(cell)
+                    if ht == ct:
+                        break
+                    d = {ht: ct}
+                    if not d:
+                        break
+                    result.append(d)
+
+        return result
 
     @cached_property
     def possible_topic_names(self):
@@ -106,7 +133,7 @@ class EzSoupHelper:
         return list(set(result))
 
     @cached_property
-    def address(self):
+    def addresses(self):
         classes = ["address", "location", "contact"]
         words = [
             "آدرس",
@@ -122,6 +149,9 @@ class EzSoupHelper:
             "تفاطع",
         ]
         #
+        def _result(res: list):
+            return sorted(res)
+
         def _texts_of(tags):
             return list({clean_text(t.text) for t in tags if t.text})
 
@@ -129,7 +159,7 @@ class EzSoupHelper:
         if ad_tags:
             texts = _texts_of(ad_tags)
             if texts:
-                return texts[0]
+                return _result(texts)
 
         def _f(class_name):
             """Returns all `class_name` like tags in the footer"""
@@ -141,8 +171,7 @@ class EzSoupHelper:
 
         if tags:
             texts = _texts_of(tags)
-            return texts[0] if texts else None
-
+            return _result(texts) if texts else None
         else:
             # searching
             footer = self.all("footer")[-1]
@@ -150,9 +179,15 @@ class EzSoupHelper:
                 return None
             for w in words:
                 search = footer.find_all(text=True)
-                texts = list({clean_text(text) for text in search if w in text})
+                texts = list(
+                    {
+                        clean_text(text)
+                        for text in search
+                        if w in text and len(text) >= 45
+                    }
+                )
                 if texts:
-                    return texts[0]
+                    return _result(texts)
 
     @cached_property
     def question_answers(self):
@@ -164,14 +199,14 @@ class EzSoupHelper:
     def _bad_topic_names(self):
         vocab = {
             "fa": ["فروشگاه", "خانه", "صفحه اصلی", "برگشت", "بازگشت"],
-            "en": ["home", "return", "back", "undo", "shop"],
+            "en": ["home", "return", "back", "undo", "shop" , "change"],
         }
         # merge all d values list into one list of str
         result = list(itertools.chain.from_iterable(vocab.values()))
         return result
 
     @cached_property
-    def application_json(self):
+    def application_json(self) -> dict:
         all_json_tags = self.all("script", attrs={"type": "application/ld+json"})
         if not all_json_tags:
             return None
@@ -229,6 +264,27 @@ class EzSoupHelper:
         """
         return self.xpath(f'{tag_name}[{attr}*="{value}"]')
 
+    def get_site_map_links(self, soup, contain: list = None):
+        hrefs = soup.a_tag_hrefs
+        if not hrefs or len(hrefs) < 3:
+            locs = soup.helper.all("loc")
+            if locs:
+                hrefs = [self.tag_text(t) for t in locs]
+        if contain:
+
+            def contain_cond(url: str):
+                for w in contain:
+                    w = w.lower()
+                    parts = pure_url(url)
+                    if len(parts) >= 2 and w in parts[1].lower():
+                        return True
+                    if len(parts) >= 3 and w in parts[2].lower():
+                        return True
+                return False
+
+            hrefs = [l for l in hrefs if contain_cond(l)]
+        return hrefs
+
     def linked_files(self, extension: str):
         """
         returns all `<a>` tags that their `href` contains `.extension`
@@ -243,14 +299,26 @@ class EzSoupHelper:
         """
         return self.contains("a", "href", f".{extension}")
 
-    def from_structured_data(self, key: str):
+    def from_structured_data(
+        self, key: str, single: bool = False, unique: bool = False
+    ):
         """
-        https://developers.google.com/search/docs/advanced/structured-data/
+        Guide : https://developers.google.com/search/docs/advanced/structured-data/intro-structured-data
+
+        Test a URL : https://developers.google.com/search/docs/advanced/structured-data/
         """
         from_json_ld = self.from_json_schema(key)
         # TODO: providing other structured schemas like
         # RDFa and Microdata
-        return from_json_ld
+        result = from_json_ld
+        if unique:
+            result = list(set(result))
+        if single:
+            if result:
+                return result[0]
+            else:
+                return
+        return result
 
     def from_json_schema(self, key: str):
         """
@@ -289,7 +357,7 @@ class EzSoupHelper:
         if not name or name == "" or len(name) > 26:
             # print("Null topic name or many charachters")
             return False
-        if name in self._bad_topic_names:
+        if name.split()[0] in self._bad_topic_names:
             return False
         site_name = self.site_name
         msg = f"| name : {name} , site name : {site_name}"

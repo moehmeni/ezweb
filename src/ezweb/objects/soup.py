@@ -1,5 +1,6 @@
 from collections import Counter
 import json
+import re
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
 from trafilatura import extract
@@ -8,7 +9,14 @@ from concurrent.futures import ThreadPoolExecutor
 from cached_property import cached_property
 
 #
-from ezweb.utils.http import safe_get, soup_of, pure_url, name_from_url, url_host
+from ezweb.utils.http import (
+    safe_get,
+    safe_head,
+    soup_of,
+    pure_url,
+    name_from_url,
+    url_host,
+)
 from ezweb.utils.text import similarity_of, clean_title
 from ezweb.utils.souphelper import EzSoupHelper
 from ezweb.utils.io import create_file
@@ -20,6 +28,7 @@ class EzSoup:
         self.soup = soup_of(self.content)
         self.url = url
         self.helper = EzSoupHelper(self.soup, self.url)
+        self.c = 0
 
     @staticmethod
     def from_url(url: str):
@@ -35,8 +44,74 @@ class EzSoup:
         return name_from_url(self.url)
 
     @cached_property
+    def site_map_url(self):
+        # if sitemap from robots.txt is provided return it
+        if self.site_map_url_from_robots_txt:
+            return self.site_map_url_from_robots_txt
+        possibles = ["sitemap.xml", "sitemap_index.xml"]
+        result = None
+        for n in possibles:
+            # lets check which sitemap is a valid sitemap URL
+            url = self.root_url + n
+            if safe_head(url).ok:
+                result = url
+                break
+        return result
+
+    @cached_property
+    def site_map_url_from_robots_txt(self):
+        r = re.compile("Sitemap:(.+)")
+        url = r.search(self.robots_txt).group(1)
+        if not url:
+            return None
+        if not "https" in url:
+            url = "https://" + url.split("://")[1]
+        return url.strip()
+
+    @cached_property
+    def site_map_product_links(self):
+        return self.site_map_links(contain=["product"])
+
+    @cached_property
+    def site_map_article_links(self):
+        return self.site_map_links(contain=["article", "blog"])
+
+    def site_map_links(self, contain: list = None):
+        soup = EzSoup.from_url(self.site_map_url)
+        hrefs = self.helper.get_site_map_links(soup, contain=contain)
+        not_xmls = []
+
+        def checker(link: str):
+            dot_split = link.split(".")
+            if dot_split:
+                if dot_split[-1] == "xml":
+                    soup = EzSoup.from_url(link)
+                    children = self.helper.get_site_map_links(soup)
+                    not_xmls.extend(children)
+            else:
+                not_xmls.append(link)
+
+        with ThreadPoolExecutor() as e:
+            e.map(checker, hrefs)
+
+        return list(set(not_xmls))
+
+    @cached_property
+    def robots_txt(self):
+        if not self.root_url:
+            return
+        url = self.root_url + "/robots.txt"
+        return safe_get(url).text
+
+    @cached_property
     def root_domain(self):
         return url_host(self.url).replace("www.", "")
+
+    @cached_property
+    def root_url(self):
+        if not self.root_domain:
+            return
+        return "https://" + self.root_domain
 
     @cached_property
     def title_tag_text(self):
@@ -413,3 +488,7 @@ class EzSoup:
     def save_important_links(self, path: str = None):
         path = path or (self.title + ".txt")
         create_file(path, "\n".join(self.important_hrefs))
+
+    def save_site_map_links(self, contain: list = None, path: str = None):
+        path = path or (self.title + ".txt")
+        create_file(path, "\n".join(self.site_map_links(contain=contain)))
