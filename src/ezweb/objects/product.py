@@ -14,7 +14,6 @@ class EzProduct(EzSoup):
         soup = str(soup_from_url(url))
         super().__init__(soup, url=url)
         self.url = url
-        self._main_text_container = None
 
     @cached_property
     def units(self):
@@ -57,12 +56,43 @@ class EzProduct(EzSoup):
         return self.possibility >= 0.75
 
     @cached_property
+    def low_price(self):
+        """
+        returns the lowest price if any discount
+        or multiple seller option is provided
+        """
+        return self.helper.from_structured_data("lowPrice", single=True)
+
+    @cached_property
+    def has_discount(self):
+        return bool(self.low_price)
+
+    @cached_property
+    def availablity(self):
+        in_schema = "InStock"
+        sd = self.helper.from_structured_data("availability", single=True)
+        if not sd:
+            return None
+        return True if in_schema in sd else False
+
+    @cached_property
+    def brand(self):
+        b = self.helper.application_json.get("brand")
+        if not b:
+            return
+        if isinstance(b, str):
+            return b
+        return b.get("name")
+
+    @cached_property
+    def structured_id(self):
+        sku = self.helper.from_structured_data("sku", single=True)
+        mpn = self.helper.from_structured_data("mpn", single=True)
+        return sku or mpn
+
+    @cached_property
     def main_text(self):
-        if self._main_text_container:
-            return self._main_text_container
-        result = extract(self.content)
-        self._main_text_container = result
-        return result
+        return extract(self.content)
 
     @cached_property
     def short_description(self):
@@ -113,15 +143,7 @@ class EzProduct(EzSoup):
 
     @cached_property
     def structured_price(self):
-        prices = self.helper.from_structured_data("price")
-        if not prices:
-            return
-        price = 0
-        for p in sorted(prices):
-            if p and float(p) != 0:
-                price = p
-                break
-        # print(f"-----\n Json price : {price} \n-----")
+        price = self.helper.from_structured_data("price" , single=True) or self.low_price
         return price
 
     @cached_property
@@ -131,18 +153,26 @@ class EzProduct(EzSoup):
     @cached_property
     def price_number(self):
         soup_possible_price, unit = self.price_number_unit
-        price = self.meta_price or self.structured_price or soup_possible_price
+        price = self.structured_price or self.meta_price or soup_possible_price
         if not price:
             return None
+        if "." in str(price):
+            return float(price)
         price = "".join(e for e in unidecode(str(price)) if e.isdigit())
-        return int(price)
+        price = int(price)
+        return price
 
     @cached_property
     def price_unit(self):
-        return self.price_number_unit[1]
+        from_sd = self.helper.from_structured_data("priceCurrency", single=True)
+        from_ui = self.price_number_unit[1]
+        unit = from_sd or from_ui
+        return unit
 
     @cached_property
     def price_number_humanize(self):
+        if not self.price_number:
+            return None
         return "{:20,.0f}".format(self.price_number).strip()
 
     @cached_property
@@ -214,16 +244,19 @@ class EzProduct(EzSoup):
             "name": self.site_name,
             "domain_root": self.root_domain,
             "domain_body": self.site_name_from_host,
-            "address": self.address,
+            "addresses": self.addresses,
             "phone": self.phones,
         }
 
     @cached_property
-    def address(self):
-        return self.helper.address
+    def addresses(self):
+        return self.helper.addresses
 
     @cached_property
     def phones(self):
+        a_tels = self.helper.contains("a", "href", "tel:")
+        if a_tels:
+            return list({t["href"].split(":")[-1] for t in a_tels})
         tags = self.helper.all_contains("class", "phone", parent_tag_name="footer")
 
         if not tags:
@@ -246,23 +279,35 @@ class EzProduct(EzSoup):
 
     @cached_property
     def images(self):
-        els = self.helper.all_contains("class", "gallery")
-        imgs = []
-        for el in els:
-            if el.name == "img":
-                imgs.append(el)
-            imgs.extend(el.find_all("img"))
-        images = (
-            self.helper.from_structured_data("image")
-            or imgs
-            or self.card.find_all("img")
-        )
+        def is_sim_to_main_img(img: Tag):
+            src = img.get("src", img.get("data-src"))
+            sim = similarity_of(self.main_image_src, src)
+            return 85 <= sim < 101
+
+        all_imgs = self.helper.all("img", attrs={"src": True})
+        images = list(filter(is_sim_to_main_img, all_imgs))
+
+        if not images or len(images) == 1:
+            els = self.helper.all_contains("class", "gallery")
+            imgs = []
+            for el in els:
+                if el.name == "img":
+                    imgs.append(el)
+                imgs.extend(el.find_all("img"))
+            images.extend(
+                self.helper.from_structured_data("image")
+                or imgs
+                or self.card.find_all("img")
+            )
+
         return self._ok_images(images)
 
     @cached_property
     def images_src(self):
+        if not self.images:
+            return [self.main_image_src]
         srcs = {self.helper.absolute_href_of(i) for i in self.images}
-        return list(srcs)
+        return sorted(list(srcs))
 
     @cached_property
     def specs_from_text(self):
@@ -303,9 +348,15 @@ class EzProduct(EzSoup):
     def summary_obj(self):
         obj = {
             "provider": self.provider_info,
+            "url": self.url,
+            "id_sku_or_mpn": self.structured_id,
             "title": self.title,
             "second_title": self.second_title,
+            "availability": self.availablity,
+            "low_price": self.low_price,
+            "has_discount": self.has_discount,
             "price": self.price,
+            "brand": self.brand,
             "images": self.images_src,
             "specs": self.specs,
             "possible_topics": self.possible_topic_names,
@@ -317,8 +368,14 @@ class EzProduct(EzSoup):
 
     def _ok_images(self, images: List[Tag]):
         def _ok(i: Tag):
+            if not i:
+                return
             src = self.helper.absolute_href_of(i)
-            return src and ("jpg" in src or "png" in src)
+            if not src:
+                return
+            _format = "jpg" in src or "png" in src
+            not_data = "data:image" not in src
+            return src and _format and not_data
 
         return [i for i in images if _ok(i)]
 
@@ -346,11 +403,15 @@ class EzProduct(EzSoup):
                 matched = list(zip(keys, values))
 
         for key, value in matched:
-
+            key = key.replace("-", "").strip()
+            value = value.strip()
             if len(key) > 35:  # a long key isn't a good specification
                 break
-            key = key.replace("-", "").strip()
+            if key == value:
+                break
             d = {key: value}
+            if not d:
+                break
             result.append(d)
 
         return result
