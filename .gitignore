@@ -1,6 +1,6 @@
 dist_test/
 test/
-twine.bat
+*.bat
 *.html
 *.json
 
