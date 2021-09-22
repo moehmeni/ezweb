@@ -284,6 +284,6 @@ save_content_summary_txt(path: str = None)
 ---
 
 <sub>
-This file was automatically generated via https://github.com/ml-tooling/lazydocs
+This README.md was automatically generated via https://github.com/ml-tooling/lazydocs
 </sub>
 
