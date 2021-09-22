@@ -284,6 +284,6 @@ save_content_summary_txt(path: str = None)
 ---
 
 <sub>
-_This file was automatically generated via [lazydocs](https://github.com/ml-tooling/lazydocs)._
+This file was automatically generated via https://github.com/ml-tooling/lazydocs
 </sub>
 
