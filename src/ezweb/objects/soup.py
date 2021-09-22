@@ -3,8 +3,8 @@ import json
 import re
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
-from trafilatura import extract
-from readability import Document
+from trafilatura import extract, bare_extraction
+import readability
 from concurrent.futures import ThreadPoolExecutor
 from cached_property import cached_property
 
@@ -28,7 +28,6 @@ class EzSoup:
         self.soup = soup_of(self.content)
         self.url = url
         self.helper = EzSoupHelper(self.soup, self.url)
-        self.c = 0
 
     @staticmethod
     def from_url(url: str):
@@ -133,8 +132,22 @@ class EzSoup:
         return result
 
     @cached_property
+    def main_text_without_comments(self):
+        result = extract(self.content, include_tables=False, include_comments=False)
+        return result
+
+    @cached_property
+    def readablity_document(self) -> readability.Document:
+        """Returns `readability.Document` instance of this soup"""
+        return readability.Document(self.content)
+
+    @cached_property
+    def main_text_comments_text(self):
+        return bare_extraction(self.content).get("comments")
+
+    @cached_property
     def main_html(self):
-        doc = Document(self.content)
+        doc = self.readablity_document.title
         return doc.summary()
 
     @cached_property
@@ -287,31 +300,8 @@ class EzSoup:
 
     @cached_property
     def title(self):
-        """
-        usually the `<h1>` tag content of a web page
-        is cleaner than original page `<title>` text
-        so if the h1 or h2 text is similar to the title
-        it is better to return it instead of original title text
-        """
-        _result = None
-        h1s = self.helper.all("h1")
-        h2s = self.helper.all("h2")
-        headers = h1s or h2s
-        page_title = self.title_tag_text
-        for header in headers:
-            header_tag_text = clean_title(header.text, self.site_name)
-            if header_tag_text is not None:
-                # getting the similarity of h1 and original title
-                # using `rapidfuzz` library (fuzz.ratio)
-                if similarity_of(header_tag_text, page_title) >= 70:
-                    _result = header_tag_text
-                    break
-
-        if not _result:
-            # print("title from page title tag or finally host name")
-            _result = page_title or self.site_name_from_host
-
-        return clean_title(_result, self.site_name)
+        readability_title = self.readablity_document.short_title()
+        return clean_title(readability_title, self.site_name)
 
     @cached_property
     def _not_important_routes(self):
@@ -473,9 +463,9 @@ class EzSoup:
 
         return result
 
-    def save_content_summary_txt(self, path: str = None):
-        path = path or (self.title + ".txt")
-        create_file(path, self.main_text)
+    def save_content_summary_txt(self, path: str = None, custom_content: str = None):
+        path = path or ((self.title or 'no-title') + ".txt")
+        create_file(path, custom_content or self.main_text)
 
     def save_content_summary_html(self, path: str = None):
         path = path or (self.title + ".html")
@@ -484,10 +474,6 @@ class EzSoup:
     def save_content_summary_json(self, path: str = None, custom_content: str = None):
         path = path or (self.title + ".json")
         create_file(path, custom_content or self.json_summary)
-
-    def save_important_links(self, path: str = None):
-        path = path or (self.title + ".txt")
-        create_file(path, "\n".join(self.important_hrefs))
 
     def save_site_map_links(self, contain: list = None, path: str = None):
         path = path or (self.title + ".txt")
