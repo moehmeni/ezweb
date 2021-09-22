@@ -3,7 +3,7 @@ import json
 import re
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
-from trafilatura import extract, bare_extraction
+import trafilatura
 import readability
 from concurrent.futures import ThreadPoolExecutor
 from cached_property import cached_property
@@ -125,16 +125,13 @@ class EzSoup:
 
     @cached_property
     def main_text(self):
-        result = extract(
-            self.content,
-            include_tables=False,
-        )
-        return result
+        return trafilatura.extract(self.content, include_tables=False)
 
     @cached_property
     def main_text_without_comments(self):
-        result = extract(self.content, include_tables=False, include_comments=False)
-        return result
+        return trafilatura.extract(
+            self.content, include_tables=False, include_comments=False
+        )
 
     @cached_property
     def readablity_document(self) -> readability.Document:
@@ -142,14 +139,25 @@ class EzSoup:
         return readability.Document(self.content)
 
     @cached_property
+    def trafilatura_bare_extract(self):
+        """Returns `trafilatura.bare_extraction`output (dict) of this.soup"""
+        return trafilatura.bare_extraction(self.content)
+
+    @cached_property
     def main_text_comments_text(self):
-        return bare_extraction(self.content).get("comments")
+        return self.trafilatura_bare_extract.get("comments")
 
     @cached_property
     def main_html(self):
-        doc = self.readablity_document.title
-        return doc.summary()
+        return self.readablity_document.summary()
 
+    @cached_property
+    def last_date(self):
+        """Returns the possible last date that this page has been modified"""
+        d = self.trafilatura_bare_extract.get("date")
+        if not d or len(d.strip()) == 0 : return
+        return date_parse(d)
+    
     @cached_property
     def site_name(self):
         return self.helper.site_name or self.site_name_from_host
@@ -169,7 +177,7 @@ class EzSoup:
         try:
             time = self.helper.meta_content("property", "article:published_time")
             return date_parse(time)
-        except Exception as e:
+        except Exception:
             return None
 
     @cached_property
@@ -177,7 +185,7 @@ class EzSoup:
         try:
             time = self.helper.meta_content("property", "article:modified_time")
             return date_parse(time)
-        except Exception as e:
+        except Exception:
             return None
 
     @cached_property
@@ -464,7 +472,7 @@ class EzSoup:
         return result
 
     def save_content_summary_txt(self, path: str = None, custom_content: str = None):
-        path = path or ((self.title or 'no-title') + ".txt")
+        path = path or ((self.title or "no-title") + ".txt")
         create_file(path, custom_content or self.main_text)
 
     def save_content_summary_html(self, path: str = None):
