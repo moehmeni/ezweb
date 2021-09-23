@@ -49,10 +49,9 @@ class EzSoupHelper:
         # get some nav
         nav = []
         for n in self.all("nav"):
-            if 1 > len(n.find_all("a" , href=True)) <= 4:
+            if 1 > len(n.find_all("a", href=True)) <= 4:
                 nav.append(n)
 
-                    
         id_bread = self.all_contains("id", "breadcrumb")
         class_bread = self.all_contains("class", "breadcrumb")
         breads = id_bread + class_bread
@@ -64,18 +63,19 @@ class EzSoupHelper:
         # avoid using not related tags
         if len(class_maybe) > 6:
             class_maybe = []
-            
+
         # avoid using not related tags
-        for tag in breads :
-            bread_a_tags= []
-            if tag.name == "a" :
+        for tag in breads:
+            bread_a_tags = []
+            if tag.name == "a":
                 bread_a_tags.append(tag)
             for a in tag.find_all("a"):
                 bread_a_tags.append(a)
-            if len(bread_a_tags) > 10 :
+            if len(bread_a_tags) > 10:
                 breads = []
 
-        print("nav", len(nav), "breads", len(breads), "class_maybe", len(class_maybe))
+        # print("nav", len(nav), "breads", len(breads), "class_maybe", len(class_maybe))
+        
         maybe_elements_containers = nav + breads + class_maybe
         maybe_elements = []
 
@@ -90,7 +90,7 @@ class EzSoupHelper:
         article_ul_tag = article.find("ul") if article else None
         article_ul_a = article_ul_tag.find_all("a") if article_ul_tag else []
 
-        print("maybe" , len(maybe_elements) , "article_ul" , len(article_ul_a))
+        print("maybe", len(maybe_elements), "article_ul", len(article_ul_a))
         tags = maybe_elements + article_ul_a
         return tags
 
@@ -171,12 +171,13 @@ class EzSoupHelper:
 
         if tags:
             texts = _texts_of(tags)
-            return _result(texts) if texts else None
+            return _result(texts) if texts else []
         else:
             # searching
-            footer = self.all("footer")[-1]
-            if not footer:
-                return None
+            footers = self.all("footer")
+            if not footers:
+                return []
+            footer = footers[-1]
             for w in words:
                 search = footer.find_all(text=True)
                 texts = list(
@@ -199,7 +200,7 @@ class EzSoupHelper:
     def _bad_topic_names(self):
         vocab = {
             "fa": ["فروشگاه", "خانه", "صفحه اصلی", "برگشت", "بازگشت"],
-            "en": ["home", "return", "back", "undo", "shop" , "change"],
+            "en": ["home", "return", "back", "undo", "shop", "change"],
         }
         # merge all d values list into one list of str
         result = list(itertools.chain.from_iterable(vocab.values()))
@@ -300,7 +301,7 @@ class EzSoupHelper:
         return self.contains("a", "href", f".{extension}")
 
     def from_structured_data(
-        self, key: str, single: bool = False, unique: bool = False
+        self, key: str, multiple: bool = False, unique: bool = False
     ):
         """
         Guide : https://developers.google.com/search/docs/advanced/structured-data/intro-structured-data
@@ -313,12 +314,11 @@ class EzSoupHelper:
         result = from_json_ld
         if unique:
             result = list(set(result))
-        if single:
-            if result:
-                return result[0]
+        if result:
+            if multiple:
+                return result
             else:
-                return
-        return result
+                return result[0]
 
     def from_json_schema(self, key: str):
         """
