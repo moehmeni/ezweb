@@ -4,6 +4,12 @@ test/
 *.html
 *.json
 
+# docs dir
+docs/Makefile
+docs/source/conf.py
+docs/source/_static
+docs/source/_templates
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
