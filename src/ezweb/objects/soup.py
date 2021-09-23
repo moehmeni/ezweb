@@ -144,7 +144,7 @@ class EzSoup:
         return trafilatura.bare_extraction(self.content)
 
     @cached_property
-    def main_text_comments_text(self):
+    def comments_text(self):
         return self.trafilatura_bare_extract.get("comments")
 
     @cached_property
