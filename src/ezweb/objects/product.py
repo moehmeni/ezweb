@@ -4,6 +4,7 @@ from bs4.element import Tag
 from trafilatura import extract
 from unidecode import unidecode
 from cached_property import cached_property
+#
 from ezweb.objects import EzSoup
 from ezweb.utils.http import soup_from_url
 from ezweb.utils.text import clean_title, similarity_of
@@ -43,7 +44,7 @@ class EzProduct(EzSoup):
             p += 0.6
         if self.second_title:
             p += 0.35
-        if "Product" in self.helper.from_structured_data("@type"):
+        if "Product" in self.helper.from_structured_data("@type" , multiple=True):
             p += 0.75
         if p > max_p:
             p = max_p
@@ -61,19 +62,40 @@ class EzProduct(EzSoup):
         returns the lowest price if any discount
         or multiple seller option is provided
         """
-        return self.helper.from_structured_data("lowPrice", single=True)
+        return self.helper.from_structured_data("lowPrice") or self.helper.meta_content(
+            "name", "price"
+        )
+
+    @cached_property
+    def high_price(self):
+        """
+        returns the highest price if any discount
+        or multiple seller option is provided
+        """
+        return self.helper.from_structured_data(
+            "highPrice"
+        ) or self.helper.meta_content("name", "old-price")
 
     @cached_property
     def has_discount(self):
-        return bool(self.low_price)
+        return bool(self.low_price) and bool(self.high_price)
+
+    @cached_property
+    def discount_percentage(self):
+        if not self.has_discount:
+            return None
+        d = (int(self.low_price) / int(self.high_price)) * 100
+        return 100 - round(d)
 
     @cached_property
     def availablity(self):
-        in_schema = "InStock"
-        sd = self.helper.from_structured_data("availability", single=True)
-        if not sd:
-            return None
-        return True if in_schema in sd else False
+        """Returns structured data availability"""
+        return self.helper.from_structured_data("availability")
+
+    @cached_property
+    def is_available(self):
+        """Returns whether this product is in-stock or not"""
+        return True if "instock" in str(self.availablity.lower()) else False
 
     @cached_property
     def brand(self):
@@ -86,8 +108,8 @@ class EzProduct(EzSoup):
 
     @cached_property
     def structured_id(self):
-        sku = self.helper.from_structured_data("sku", single=True)
-        mpn = self.helper.from_structured_data("mpn", single=True)
+        sku = self.helper.from_structured_data("sku")
+        mpn = self.helper.from_structured_data("mpn")
         return sku or mpn
 
     @cached_property
@@ -101,6 +123,7 @@ class EzProduct(EzSoup):
     @cached_property
     def second_title(self):
         sc_title = self.helper.from_structured_data("alternateName")
+        print(sc_title)
         if sc_title and isinstance(sc_title, str):
             return clean_title(sc_title, self.site_name)
         h1 = self.card.find("h1")
@@ -143,7 +166,7 @@ class EzProduct(EzSoup):
 
     @cached_property
     def structured_price(self):
-        price = self.helper.from_structured_data("price" , single=True) or self.low_price
+        price = self.helper.from_structured_data("price") or self.low_price
         return price
 
     @cached_property
@@ -164,7 +187,7 @@ class EzProduct(EzSoup):
 
     @cached_property
     def price_unit(self):
-        from_sd = self.helper.from_structured_data("priceCurrency", single=True)
+        from_sd = self.helper.from_structured_data("priceCurrency")
         from_ui = self.price_number_unit[1]
         unit = from_sd or from_ui
         return unit
@@ -293,9 +316,10 @@ class EzProduct(EzSoup):
             for el in els:
                 if el.name == "img":
                     imgs.append(el)
+                    continue
                 imgs.extend(el.find_all("img"))
             images.extend(
-                self.helper.from_structured_data("image")
+                self.helper.from_structured_data("image" , multiple=True)
                 or imgs
                 or self.card.find_all("img")
             )
@@ -315,13 +339,16 @@ class EzProduct(EzSoup):
 
     @cached_property
     def card(self) -> Union[Tag, None]:
-        class_p = self.helper.all_contains("class", "product")
-        id_p = self.helper.all_contains("id", "product")
+        c = self.helper.all_contains
+        class_p = c("class", "product")
+        id_p = c("id", "product")
 
         els = [tag for tag in class_p + id_p if tag.name != "body"]
 
         if not els:
-            els = self.helper.all_contains("class", "container")
+            els = c("class", "container")
+
+        product_related_scores = []
 
         def main_card_criterion(tag: Tag):
             point = 0
@@ -333,8 +360,9 @@ class EzProduct(EzSoup):
                 point = point + 15
             imgs = self._ok_images(tag.find_all("img"))
             score = len(imgs) + point
-            # if score > 2 :
-            # print(f"{tag.name} class : {tag.get('class' , None)} , id : {tag.get('id' , None)}   score : {score}")
+            # if score > 2:
+            # print(f"score : {score} | {tag.name}.{tag.get('class' , None)}#{tag.get('id' , None)}")
+            product_related_scores.append(score)
             return score
 
         most_content_product_el = sorted(els, key=lambda t: main_card_criterion(t))[-1]
@@ -369,16 +397,18 @@ class EzProduct(EzSoup):
             "id_sku_or_mpn": self.structured_id,
             "title": self.title,
             "second_title": self.second_title,
-            "availability": self.availablity,
+            "is_available": self.is_available,
             "low_price": self.low_price,
+            "high_price": self.high_price,
             "has_discount": self.has_discount,
+            "discount_percentage": self.discount_percentage,
             "price": self.price,
             "brand": self.brand,
             "images": self.images_src,
             "specs": self.specs,
             "possible_topics": self.possible_topic_names,
             # "links" : self.a_tag_hrefs_internal
-            # "card": self._tag_obj(self.card),
+            "card": self._tag_obj(self.card),
             # "main_text" : main_text ,
         }
         return obj
