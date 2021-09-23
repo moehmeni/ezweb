@@ -338,6 +338,23 @@ class EzProduct(EzSoup):
             return score
 
         most_content_product_el = sorted(els, key=lambda t: main_card_criterion(t))[-1]
+
+        high_score_count = len(list(filter(lambda x: x >= 15, product_related_scores)))
+        if not high_score_count:
+            print("checking the low-level containers for the card...", end=" ")
+            product_related_scores.clear()
+            els = c("class", "container") + c("class", "row")
+            most_content_product_el = sorted(els, key=lambda t: main_card_criterion(t))[
+                -1
+            ]
+            high_score_count = len(
+                list(filter(lambda x: x >= 15, product_related_scores))
+            )
+            if high_score_count:
+                print(f"now seems {high_score_count} element(s) have/has a good score")
+            else:
+                print("couldn't find a main card tag again !")
+
         return most_content_product_el
 
     @cached_property
