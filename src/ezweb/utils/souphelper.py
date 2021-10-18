@@ -9,7 +9,7 @@ from cached_property import cached_property
 import itertools
 
 #
-from ezweb.utils.http import name_from_url
+from ezweb.utils.http import name_from_url, pure_url
 from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
@@ -401,7 +401,7 @@ class EzSoupHelper:
 
         if not link:
             return
-
+        
         root_domain = urlparse(self.url).netloc.replace("www.", "")
         root = "https://" + root_domain
         result = None
@@ -413,6 +413,12 @@ class EzSoupHelper:
                 is_internal = link_domain == root_domain
                 if not is_internal:
                     return None
+                
+        elif "www" in link:
+            link = link[link.index("www"):]
+            link = "/" + "/".join(pure_url(link)[1:])
+            result = root + link
+            
         else:
             if link[0] != "/":
                 # hashtags or ?&

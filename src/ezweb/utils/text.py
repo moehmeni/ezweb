@@ -1,7 +1,6 @@
 from collections import Counter
 from rapidfuzz.fuzz import ratio
 
-
 def similarity_of(str1 :str , str2 : str):
     return round(ratio(str1 , str2))
 
@@ -30,6 +29,6 @@ def clean_text(string: str):
     if not string : return None
     if isinstance(string , str):
         text = string.strip().replace("\n", "").replace("\r", "").replace("\t", "")
-        if text == "":
+        if not text:
             return None
         return text
