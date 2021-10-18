@@ -1,6 +1,6 @@
 import requests
 from pathlib import PurePosixPath
-from typing import Union
+from typing import List, Tuple, Union
 from bs4 import BeautifulSoup, FeatureNotFound
 from urllib.parse import unquote, urlparse
 import os
@@ -99,24 +99,32 @@ def name_from_url(url: str):
     return name.capitalize()
 
 
-def get_site_map_links(url: str, contain: list = None):
-    soup = soup_from_url(url)
+def get_site_map_links(sitemap_url: str, contain: list = None):
+    soup = soup_from_url(sitemap_url)
     hrefs = list({a["href"] for a in soup.find_all("a", href=True)})
+    
     if not hrefs or len(hrefs) < 3:
         locs = soup.find_all("loc")
         if locs:
             hrefs = list({t.get_text(strip=True) for t in locs if t.text})
-    if contain:
+        
+    # only apply contain-check if the sitemap URLs are not direct for the content
+    first_paths = list({pure_url(l)[1] for l in hrefs if len(pure_url(l)) >= 2})
+    hrefs_are_direct_to_content = len(first_paths) > 45
+    if not hrefs_are_direct_to_content :
+        if contain:
+            def contain_cond(url: str):
+                for w in contain:
+                    w = w.lower()
+                    parts = pure_url(url)
+                    if len(parts) >= 2 and w in parts[1].lower():
+                        return True
+                    if len(parts) >= 3 and w in parts[2].lower():
+                        return True
+                return False
 
-        def contain_cond(url: str):
-            for w in contain:
-                w = w.lower()
-                parts = pure_url(url)
-                if len(parts) >= 2 and w in parts[1].lower():
-                    return True
-                if len(parts) >= 3 and w in parts[2].lower():
-                    return True
-            return False
-
-        hrefs = [l for l in hrefs if contain_cond(l)]
-    return hrefs
+            hrefs = [l for l in hrefs if contain_cond(l)]
+    elif contain :
+        print(f"We had {len(first_paths)} different first path of the URLs")
+        print("Seems the first sitemap links are direct to the webpages. So I didn't apply contain checks")
+    return hrefs , hrefs_are_direct_to_content
