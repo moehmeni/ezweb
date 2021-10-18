@@ -9,27 +9,30 @@ import os
 def cls():
     os.system("cls" if os.name == "nt" else "clear")
 
+
 def safe_get(url: str) -> requests.Response:
-    print(f"Requesting {url}\n" , end="\r")
+    print(f"Requesting {url}\n", end="\r")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-    t = round(response.elapsed.total_seconds() , 3)
+    t = round(response.elapsed.total_seconds(), 3)
     print(f"> Request finished : {t} seconds")
     return response
 
+
 def safe_head(url: str) -> requests.Response:
-    print(f"Heading {url}\n" , end="\r")
+    print(f"Heading {url}\n", end="\r")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
     response = requests.head(url, headers=headers)
     response.raise_for_status()
-    t = round(response.elapsed.total_seconds() , 3)
+    t = round(response.elapsed.total_seconds(), 3)
     print(f"> Head Request finished : {t} seconds")
     return response
+
 
 def soup_from_url(url: str) -> BeautifulSoup:
     response = safe_get(url)
@@ -94,3 +97,26 @@ def name_from_url(url: str):
     dot_splited = root.split(".")
     name = dot_splited[1] if "www" in root else dot_splited[0]
     return name.capitalize()
+
+
+def get_site_map_links(url: str, contain: list = None):
+    soup = soup_from_url(url)
+    hrefs = list({a["href"] for a in soup.find_all("a", href=True)})
+    if not hrefs or len(hrefs) < 3:
+        locs = soup.find_all("loc")
+        if locs:
+            hrefs = list({t.get_text(strip=True) for t in locs if t.text})
+    if contain:
+
+        def contain_cond(url: str):
+            for w in contain:
+                w = w.lower()
+                parts = pure_url(url)
+                if len(parts) >= 2 and w in parts[1].lower():
+                    return True
+                if len(parts) >= 3 and w in parts[2].lower():
+                    return True
+            return False
+
+        hrefs = [l for l in hrefs if contain_cond(l)]
+    return hrefs
