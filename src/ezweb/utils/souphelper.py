@@ -9,7 +9,7 @@ from cached_property import cached_property
 import itertools
 
 #
-from ezweb.utils.http import name_from_url, pure_url
+from ezweb.utils.http import name_from_url
 from ezweb.utils.text import clean_text, clean_title, similarity_of
 
 
@@ -49,7 +49,7 @@ class EzSoupHelper:
         # get some nav
         nav = []
         for n in self.all("nav"):
-            if 1 > len(n.find_all("a", href=True)) <= 4:
+            if 1 < len(n.find_all("a", href=True)) <= 4:
                 nav.append(n)
 
         id_bread = self.all_contains("id", "breadcrumb")
@@ -265,27 +265,6 @@ class EzSoupHelper:
         """
         return self.xpath(f'{tag_name}[{attr}*="{value}"]')
 
-    def get_site_map_links(self, soup, contain: list = None):
-        hrefs = soup.a_tag_hrefs
-        if not hrefs or len(hrefs) < 3:
-            locs = soup.helper.all("loc")
-            if locs:
-                hrefs = [self.tag_text(t) for t in locs]
-        if contain:
-
-            def contain_cond(url: str):
-                for w in contain:
-                    w = w.lower()
-                    parts = pure_url(url)
-                    if len(parts) >= 2 and w in parts[1].lower():
-                        return True
-                    if len(parts) >= 3 and w in parts[2].lower():
-                        return True
-                return False
-
-            hrefs = [l for l in hrefs if contain_cond(l)]
-        return hrefs
-
     def linked_files(self, extension: str):
         """
         returns all `<a>` tags that their `href` contains `.extension`
@@ -351,23 +330,23 @@ class EzSoupHelper:
 
         return values
 
-    def _ok_topic_name(self, name: str):
-        reason = None
+    def _ok_topic_name(self, name: str) -> bool:
+        if name.isdigit() : return
         name = name.lower()
         if not name or name == "" or len(name) > 26:
             # print("Null topic name or many charachters")
-            return False
+            return
         if name.split()[0] in self._bad_topic_names:
-            return False
+            return
         site_name = self.site_name
         msg = f"| name : {name} , site name : {site_name}"
         if name == site_name:
             # print(f"Topic name is exactly site name {msg}")
-            return False
+            return
         sim = similarity_of(name, site_name)
         if sim > 65:
             # print(f"Topic name is similar with site name {msg} , similarity : {sim}")
-            return False
+            return
         return True
 
     def _number_groups(self, t: Tag, pattern):
