@@ -1,6 +1,5 @@
 from collections import Counter
 import json
-import re
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
 import trafilatura
@@ -11,7 +10,6 @@ from cached_property import cached_property
 #
 from ezweb.utils.http import (
     safe_get,
-    safe_head,
     soup_of,
     pure_url,
     name_from_url,
@@ -19,6 +17,7 @@ from ezweb.utils.http import (
 )
 from ezweb.utils.text import similarity_of, clean_title
 from ezweb.utils.souphelper import EzSoupHelper
+from ezweb.objects.source import EzSource
 from ezweb.utils.io import create_file
 
 
@@ -28,6 +27,8 @@ class EzSoup:
         self.soup = soup_of(self.content)
         self.url = url
         self.helper = EzSoupHelper(self.soup, self.url)
+        if url:
+            self.source = EzSource(url)
 
     @staticmethod
     def from_url(url: str):
@@ -37,70 +38,6 @@ class EzSoup:
     def url_parts(self):
         if self.url:
             return pure_url(self.url)
-
-    @cached_property
-    def site_name_from_host(self):
-        return name_from_url(self.url)
-
-    @cached_property
-    def site_map_url(self):
-        # if sitemap from robots.txt is provided return it
-        if self.site_map_url_from_robots_txt:
-            return self.site_map_url_from_robots_txt
-        possibles = ["sitemap.xml", "sitemap_index.xml"]
-        result = None
-        for n in possibles:
-            # lets check which sitemap is a valid sitemap URL
-            url = self.root_url + n
-            if safe_head(url).ok:
-                result = url
-                break
-        return result
-
-    @cached_property
-    def site_map_url_from_robots_txt(self):
-        r = re.compile("Sitemap:(.+)")
-        url = r.search(self.robots_txt).group(1)
-        if not url:
-            return None
-        if not "https" in url:
-            url = "https://" + url.split("://")[1]
-        return url.strip()
-
-    @cached_property
-    def site_map_product_links(self):
-        return self.site_map_links(contain=["product"])
-
-    @cached_property
-    def site_map_article_links(self):
-        return self.site_map_links(contain=["article", "blog"])
-
-    def site_map_links(self, contain: list = None):
-        soup = EzSoup.from_url(self.site_map_url)
-        hrefs = self.helper.get_site_map_links(soup, contain=contain)
-        not_xmls = []
-
-        def checker(link: str):
-            dot_split = link.split(".")
-            if dot_split:
-                if dot_split[-1] == "xml":
-                    soup = EzSoup.from_url(link)
-                    children = self.helper.get_site_map_links(soup)
-                    not_xmls.extend(children)
-            else:
-                not_xmls.append(link)
-
-        with ThreadPoolExecutor() as e:
-            e.map(checker, hrefs)
-
-        return list(set(not_xmls))
-
-    @cached_property
-    def robots_txt(self):
-        if not self.root_url:
-            return
-        url = self.root_url + "/robots.txt"
-        return safe_get(url).text
 
     @cached_property
     def root_domain(self):
@@ -117,11 +54,7 @@ class EzSoup:
         tag = self.helper.first("title")
         if not tag:
             return None
-        return clean_title(tag.text, self.site_name)
-
-    @cached_property
-    def text(self):
-        return self.soup.get_text(separator="\n", strip=True)
+        return clean_title(tag.text, self.source.name)
 
     @cached_property
     def main_text(self):
@@ -141,7 +74,7 @@ class EzSoup:
     @cached_property
     def trafilatura_bare_extract(self):
         """Returns `trafilatura.bare_extraction`output (dict) of this.soup"""
-        return trafilatura.bare_extraction(self.content)
+        return trafilatura.bare_extraction(self.content , date_extraction_params={"outputformat" : "%Y-%m-%dT%H:%M:%S%z"})
 
     @cached_property
     def comments_text(self):
@@ -155,12 +88,9 @@ class EzSoup:
     def last_date(self):
         """Returns the possible last date that this page has been modified"""
         d = self.trafilatura_bare_extract.get("date")
-        if not d or len(d.strip()) == 0 : return
+        if not d:
+            return
         return date_parse(d)
-    
-    @cached_property
-    def site_name(self):
-        return self.helper.site_name or self.site_name_from_host
 
     @cached_property
     def meta_description(self):
@@ -286,30 +216,9 @@ class EzSoup:
         return True
 
     @cached_property
-    def favicon_href(self):
-        icon_links = self.helper.contains("link", "rel", "icon")
-        if not icon_links:
-            return None
-
-        multiple_sized_icon_links = [
-            link for link in icon_links if link.get("sizes", None)
-        ]
-        if not multiple_sized_icon_links:
-            # return the only one src
-            return icon_links[0].get("href", None)
-
-        # sort links with their icon image sizes
-        sorted_sized_icon_links = sorted(
-            multiple_sized_icon_links, key=lambda t: int(t["sizes"].split("x")[0])
-        )
-        biggest_icon_link_tag = sorted_sized_icon_links[-1]
-
-        return biggest_icon_link_tag.get("href", None)
-
-    @cached_property
     def title(self):
         readability_title = self.readablity_document.short_title()
-        return clean_title(readability_title, self.site_name)
+        return clean_title(readability_title, self.source.name)
 
     @cached_property
     def _not_important_routes(self):
@@ -417,11 +326,14 @@ class EzSoup:
     @cached_property
     def summary_dict(self):
         obj = {
+            "source": self.source.summary_dict,
             "title": self.title,
             "description": self.meta_description,
+            "date" : str(self.last_date) ,
             "main_image": self.main_image_src,
             "main_content": self.main_text[:100] + " ...",
             "possible_topics": self.possible_topic_names,
+            "comments": self.comments_text,
         }
         if self.url:
             obj = {**{"url": self.url}, **obj}
@@ -485,4 +397,4 @@ class EzSoup:
 
     def save_site_map_links(self, contain: list = None, path: str = None):
         path = path or (self.title + ".txt")
-        create_file(path, "\n".join(self.site_map_links(contain=contain)))
+        create_file(path, "\n".join(self.source.site_map_links(contain=contain)))
