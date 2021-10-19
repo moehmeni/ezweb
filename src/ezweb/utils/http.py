@@ -10,32 +10,38 @@ def cls():
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def safe_get(url: str) -> requests.Response:
-    print(f"Requesting {url}\n", end="\r")
+def safe_get(
+    url: str, raise_for_status: bool = True, log_name: str = ""
+) -> requests.Response:
+    print(log_name, f"Requesting {url}\n", end="\r")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    if raise_for_status:
+        response.raise_for_status()
     t = round(response.elapsed.total_seconds(), 3)
     print(f"> Request finished : {t} seconds")
     return response
 
 
-def safe_head(url: str) -> requests.Response:
-    print(f"Heading {url}\n", end="\r")
+def safe_head(
+    url: str, raise_for_status: bool = True, log_name: str = ""
+) -> requests.Response:
+    print(log_name, f"Heading {url}\n", end="\r")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
     response = requests.head(url, headers=headers)
-    response.raise_for_status()
+    if raise_for_status:
+        response.raise_for_status()
     t = round(response.elapsed.total_seconds(), 3)
     print(f"> Head Request finished : {t} seconds")
     return response
 
 
-def soup_from_url(url: str) -> BeautifulSoup:
-    response = safe_get(url)
+def soup_from_url(url: str , **kwargs) -> BeautifulSoup:
+    response = safe_get(url , **kwargs)
     return soup_of(response.text)
 
 
@@ -102,17 +108,18 @@ def name_from_url(url: str):
 def get_site_map_links(sitemap_url: str, contain: list = None):
     soup = soup_from_url(sitemap_url)
     hrefs = list({a["href"] for a in soup.find_all("a", href=True)})
-    
+
     if not hrefs or len(hrefs) < 3:
         locs = soup.find_all("loc")
         if locs:
             hrefs = list({t.get_text(strip=True) for t in locs if t.text})
-        
+
     # only apply contain-check if the sitemap URLs are not direct for the content
     first_paths = list({pure_url(l)[1] for l in hrefs if len(pure_url(l)) >= 2})
     hrefs_are_direct_to_content = len(first_paths) > 45
-    if not hrefs_are_direct_to_content :
+    if not hrefs_are_direct_to_content:
         if contain:
+
             def contain_cond(url: str):
                 for w in contain:
                     w = w.lower()
@@ -124,7 +131,9 @@ def get_site_map_links(sitemap_url: str, contain: list = None):
                 return False
 
             hrefs = [l for l in hrefs if contain_cond(l)]
-    elif contain :
+    elif contain:
         print(f"We had {len(first_paths)} different first path of the URLs")
-        print("Seems the first sitemap links are direct to the webpages. So I didn't apply contain checks")
-    return hrefs , hrefs_are_direct_to_content
+        print(
+            "Seems the first sitemap links are direct to the webpages. So I didn't apply contain checks"
+        )
+    return hrefs, hrefs_are_direct_to_content
