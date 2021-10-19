@@ -1,5 +1,6 @@
 from collections import Counter
 import json
+from typing import List
 from bs4.element import Tag
 from dateutil.parser import parse as date_parse
 import trafilatura
@@ -12,7 +13,6 @@ from ezweb.utils.http import (
     safe_get,
     soup_of,
     pure_url,
-    name_from_url,
     url_host,
 )
 from ezweb.utils.text import similarity_of, clean_title
@@ -22,17 +22,29 @@ from ezweb.utils.io import create_file
 
 
 class EzSoup:
-    def __init__(self, content: str, url: str = None) -> None:
-        self.content = content
-        self.soup = soup_of(self.content)
-        self.url = url
-        self.helper = EzSoupHelper(self.soup, self.url)
-        if url:
-            self.source = EzSource(url)
+    def __init__(
+        self,
+        content: str = None,
+        url: str = None,
+        source : EzSource = None ,
+        topics: List[str] = None,
+    ) -> None:
+        assert content or url , "At least one of page HTML content or page URL must be determined"
+        if not content:
+            self.content = safe_get(url , log_name="EzSoup initial").text
+        else:
+            self.content = content
+        if url :
+            self.source = source or EzSource(url)
 
-    @staticmethod
-    def from_url(url: str):
-        return EzSoup(safe_get(url).text, url=url)
+        self.soup = soup_of(self.content)
+        self.helper = EzSoupHelper(self.soup, url=url)
+        
+
+        # Initilizing some containers to avoid recalculate -
+        # pre-determined arguments
+        self.url = url
+        self._topics = topics
 
     @cached_property
     def url_parts(self):
@@ -74,7 +86,9 @@ class EzSoup:
     @cached_property
     def trafilatura_bare_extract(self):
         """Returns `trafilatura.bare_extraction`output (dict) of this.soup"""
-        return trafilatura.bare_extraction(self.content , date_extraction_params={"outputformat" : "%Y-%m-%dT%H:%M:%S%z"})
+        return trafilatura.bare_extraction(
+            self.content, date_extraction_params={"outputformat": "%Y-%m-%dT%H:%M:%S%z"}
+        )
 
     @cached_property
     def comments_text(self):
@@ -316,12 +330,13 @@ class EzSoup:
         return result
 
     @cached_property
-    def possible_topic_names(self):
+    def topic_names(self):
         """
-        returns possible topic/breadcrump names of webpage
-        ### values can be unreliable since they aren't generated with NLP methods yet .
+        returns RSS data topics or the possible topic/breadcrumb names of the webpage
+        and thus values can be unreliable
+        since they aren't generated with the NLP methods.
         """
-        return self.helper.possible_topic_names
+        return self._topics or self.helper.possible_topic_names
 
     @cached_property
     def summary_dict(self):
@@ -329,10 +344,10 @@ class EzSoup:
             "source": self.source.summary_dict,
             "title": self.title,
             "description": self.meta_description,
-            "date" : str(self.last_date) ,
+            "date": str(self.last_date),
             "main_image": self.main_image_src,
             "main_content": self.main_text[:100] + " ...",
-            "possible_topics": self.possible_topic_names,
+            "possible_topics": self.topic_names,
             "comments": self.comments_text,
         }
         if self.url:
@@ -373,13 +388,13 @@ class EzSoup:
         if multithread:
             # request children urls with multiple threads
             def maper(url: str):
-                result.append(EzSoup.from_url(url))
+                result.append(EzSoup(url=url))
 
             with ThreadPoolExecutor() as executor:
                 executor.map(maper, links)
         else:
             # normal `for` loop and wait for each request to be completed
-            result = [EzSoup.from_url(url) for url in links]
+            result = [EzSoup(url=url) for url in links]
 
         return result
 

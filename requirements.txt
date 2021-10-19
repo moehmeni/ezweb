@@ -6,3 +6,4 @@ rapidfuzz
 readability-lxml
 trafilatura
 cached-property
+feedparser
