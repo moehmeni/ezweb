@@ -13,7 +13,7 @@ from ezweb.utils.text import clean_title, similarity_of
 class EzProduct(EzSoup):
     def __init__(self, url: str) -> None:
         soup = str(soup_from_url(url))
-        super().__init__(soup, url=url)
+        super().__init__(content=soup, url=url)
         self.url = url
 
     @cached_property
