@@ -1,6 +1,6 @@
 import requests
 from pathlib import PurePosixPath
-from typing import List, Tuple, Union
+from typing import Union
 from bs4 import BeautifulSoup, FeatureNotFound
 from urllib.parse import unquote, urlparse
 import os
@@ -13,7 +13,7 @@ def cls():
 def safe_get(
     url: str, raise_for_status: bool = True, log_name: str = ""
 ) -> requests.Response:
-    print(log_name, f"Requesting {url}\n", end="\r")
+    # print(log_name, f"Requesting {url}\n", end="")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
@@ -21,14 +21,14 @@ def safe_get(
     if raise_for_status:
         response.raise_for_status()
     t = round(response.elapsed.total_seconds(), 3)
-    print(f"> Request finished : {t} seconds")
+    print(f"Request finished : {t} seconds", url)
     return response
 
 
 def safe_head(
     url: str, raise_for_status: bool = True, log_name: str = ""
 ) -> requests.Response:
-    print(log_name, f"Heading {url}\n", end="\r")
+    # print(log_name, f"Heading {url}\n", end="")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36"
     }
@@ -36,12 +36,12 @@ def safe_head(
     if raise_for_status:
         response.raise_for_status()
     t = round(response.elapsed.total_seconds(), 3)
-    print(f"> Head Request finished : {t} seconds")
+    print(f"Head Request finished : {t} seconds", url)
     return response
 
 
-def soup_from_url(url: str , **kwargs) -> BeautifulSoup:
-    response = safe_get(url , **kwargs)
+def soup_from_url(url: str, **kwargs) -> BeautifulSoup:
+    response = safe_get(url, **kwargs)
     return soup_of(response.text)
 
 

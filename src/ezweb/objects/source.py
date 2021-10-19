@@ -82,7 +82,7 @@ class EzSource:
                 result = url
                 break
         assert result, f"Couldn't find a RSS URL for {self.url}"
-        print("Source RSS URL", result)
+        # print("Source RSS URL", result)
         return result
 
     @cached_property
@@ -116,7 +116,7 @@ class EzSource:
                 result = url
                 break
         assert result, f"Couldn't find a Sitemap URL for {self.url}"
-        print("Source Sitemap URL", result)
+        # print("Source Sitemap URL", result)
         return result
 
     @cached_property
