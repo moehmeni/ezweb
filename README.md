@@ -11,7 +11,7 @@ from ezweb import EzSoup
 
 url = "https://www.pcmag.com/opinions/windows-11-is-ultra-secure-dont-mess-it-up"
 
-page = EzSoup.from_url(url)
+page = EzSoup(url = url)
 
 print(page.json_summary)
 ```
