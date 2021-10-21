@@ -26,20 +26,21 @@ class EzSoup:
         self,
         content: str = None,
         url: str = None,
-        source : EzSource = None ,
+        source: EzSource = None,
         topics: List[str] = None,
     ) -> None:
-        assert content or url , "At least one of page HTML content or page URL must be determined"
+        assert (
+            content or url
+        ), "At least one of page HTML content or page URL must be determined"
         if not content:
-            self.content = safe_get(url , log_name="EzSoup initial").text
+            self.content = safe_get(url, log_name="EzSoup initial").text
         else:
             self.content = content
-        if url :
+        if url:
             self.source = source or EzSource(url)
 
         self.soup = soup_of(self.content)
         self.helper = EzSoupHelper(self.soup, url=url)
-        
 
         # Initilizing some containers to avoid recalculate -
         # pre-determined arguments

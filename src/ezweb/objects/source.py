@@ -6,7 +6,9 @@ from feedparser.util import FeedParserDict
 from cached_property import cached_property
 import re
 from concurrent.futures import ThreadPoolExecutor
-
+import ssl
+if hasattr(ssl, '_create_unverified_context'):
+    ssl._create_default_https_context = ssl._create_unverified_context
 #
 from ezweb.utils.http import (
     can_be_rss_link,
@@ -21,6 +23,7 @@ from ezweb.utils.http import (
 from ezweb.utils.souphelper import EzSoupHelper
 
 
+    
 class EzSource:
     def __init__(self, url: str):
         self.url = "https://" + url_host(url)
