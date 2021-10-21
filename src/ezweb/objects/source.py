@@ -1,5 +1,6 @@
 from typing import List, Optional
 from urllib.parse import urlparse
+from bs4.element import Tag
 import feedparser
 from feedparser.util import FeedParserDict
 from cached_property import cached_property
@@ -8,8 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 #
 from ezweb.utils.http import (
+    can_be_rss_link,
     get_site_map_links,
     name_from_url,
+    path_to_url,
     safe_get,
     safe_head,
     soup_from_url,
@@ -35,7 +38,7 @@ class EzSource:
     @cached_property
     def name_from_rss(self):
         return self._from_rss_feed("title")
-    
+
     @cached_property
     def domain(self):
         """Returns a pattern like `example.com`"""
@@ -43,7 +46,8 @@ class EzSource:
 
     @cached_property
     def description(self):
-        return self._from_rss_feed("description")
+        m = self.helper.meta_content
+        return self._from_rss_feed("description") or m("name", "description")
 
     @cached_property
     def language(self):
@@ -75,20 +79,26 @@ class EzSource:
     @cached_property
     def rss_feed_url(self):
         """Returns the possible RSS URL of the source"""
-        possibilities = ["rss", "feed", "feeds"]
-        result = None
-        for n in possibilities:
-            url = self.url
-            if url[-1] != "/":
-                url += "/"
-            url += n
-            head = safe_get(url, raise_for_status=False)
-            content_type = head.headers.get("content-type", [])
-            if head.ok and "rss" in content_type:
-                result = url
-                break
-        # assert result, f"Couldn't find a RSS URL for {self.url}"
-        # print("Source RSS URL", result)
+        first_guess = ["rss", "feed", "feeds"]
+
+        def _finder(possibilities: List[str]):
+            for url in possibilities:
+                response = safe_get(url, raise_for_status=False)
+                ct = response.headers.get("content-type", [])
+                ct_ok = "xml" in ct or "rss" in ct
+                if response.ok and ct_ok:
+                    return url
+                
+        result = _finder([path_to_url(p) for p in first_guess])
+        if not result:
+            # find a rss like href in the page
+            all_a_tags = self.helper.all("a")
+            other_guess = [
+                self.helper.absolute_href_of(a)
+                for a in all_a_tags
+                if can_be_rss_link(a)
+            ]
+            result = _finder(other_guess)
         return result
 
     @cached_property
@@ -101,13 +111,14 @@ class EzSource:
         >>> feedparser.parse(self.rss_feed_url)
         ```
         """
-        if not self.rss_feed_url : return None
+        if not self.rss_feed_url:
+            return None
         return feedparser.parse(self.rss_feed_url)
 
     @cached_property
     def rss_links(self) -> List[str]:
         """Returns the all URLs included in RSS data"""
-        return list({i.link for i in self.rss_data.get("entries" , [])})
+        return list({i.link for i in self.rss_data.get("entries", [])})
 
     @cached_property
     def site_map_url(self):
@@ -122,8 +133,6 @@ class EzSource:
             if safe_head(url, raise_for_status=False).ok:
                 result = url
                 break
-        # assert result, f"Couldn't find a Sitemap URL for {self.url}"
-        # print("Source Sitemap URL", result)
         return result
 
     @cached_property
@@ -162,18 +171,22 @@ class EzSource:
             # "topics": [],
         }
         return obj
-    
-    def _from_rss_feed(self , feedparser_key : str):
-        if not self.rss_data : return None
+
+    def _from_rss_feed(self, feedparser_key: str):
+        if not self.rss_data:
+            return None
         feed = self.rss_data.get("feed")
-        if not feed : return None
+        if not feed:
+            return None
         return feed.get(feedparser_key)
 
     def get_rss_items(self, ez_soup_class, limit: int = None) -> list:
         """Returns the all `EzSoup` items(articles) provided in the RSS data"""
-        if not self.rss_data : return []
+        if not self.rss_data:
+            return []
         entries = self.rss_data.get("entries")
-        if not entries : return []
+        if not entries:
+            return []
         result = []
         resource = entries[:limit] if limit else entries
         for item in resource:
@@ -183,7 +196,8 @@ class EzSource:
         return result
 
     def site_map_links(self, contain: Optional[list]):
-        if not self.site_map_url : return None
+        if not self.site_map_url:
+            return None
         hrefs, directed = get_site_map_links(self.site_map_url, contain=contain)
         if directed:
             return hrefs
