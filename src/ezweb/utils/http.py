@@ -104,6 +104,21 @@ def name_from_url(url: str):
     name = dot_splited[1] if "www" in root else dot_splited[0]
     return name.capitalize()
 
+def path_to_url(path: str , url : str):
+    if url[-1] != "/":
+        url += "/"
+    url += path
+    return url
+
+def can_be_rss_link(a) -> bool:
+    href = a.get("href")
+    if not href:
+        return
+    if "rss" in href:
+        return True
+    if "rss" in (a.text or ""):
+        return True
+    return False
 
 def get_site_map_links(sitemap_url: str, contain: list = None):
     soup = soup_from_url(sitemap_url)
