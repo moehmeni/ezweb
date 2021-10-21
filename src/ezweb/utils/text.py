@@ -19,9 +19,6 @@ def clean_title(string : str , site_name : str = None):
         for w in bads:
             string = string.replace(w, " ")
         result = string.replace("  " , "").strip()
-        at_first = result[0] == "و"
-        if at_first:
-            result = "".join(list(result)[1:])
         if result == "" : return None
         return result
 
