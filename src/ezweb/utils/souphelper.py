@@ -58,7 +58,17 @@ class EzSoupHelper:
 
         class_cat = self.contains("div", "class", "cat")
         class_tag = self.contains("div", "class", "tag")
-        class_maybe = class_cat + class_tag
+        class_label = self.contains("div", "class", "label")
+        class_maybe = class_cat + class_tag + class_label
+        
+        class_maybe_li = []
+        for el in class_maybe :
+            if el.name == "li":
+                class_maybe_li.append(el)
+                continue
+            lis = el.find_all("li")
+            if lis :
+                class_maybe_li.extend(lis)
 
         # avoid using not related tags
         if len(class_maybe) > 6:
@@ -78,7 +88,11 @@ class EzSoupHelper:
         
         maybe_elements_containers = nav + breads + class_maybe
         maybe_elements = []
-
+        
+        # if li tags are ok , set them
+        if 0 < len(class_maybe_li) < 6 :
+            maybe_elements_containers = class_maybe_li
+            
         # filling maybe_elements with all <a> in selected parents (containers)
         for el in maybe_elements_containers:
             a_tags = el.find_all("a")
@@ -336,6 +350,9 @@ class EzSoupHelper:
         if not name or name == "" or len(name) > 26:
             # print("Null topic name or many charachters")
             return
+        ws = ["@:]["]
+        for w in ws : 
+            if w in name : return
         if name.split()[0] in self._bad_topic_names:
             return
         site_name = self.site_name
