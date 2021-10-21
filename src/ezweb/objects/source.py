@@ -1,4 +1,5 @@
 from typing import List, Optional
+from urllib.parse import urlparse
 import feedparser
 from feedparser.util import FeedParserDict
 from cached_property import cached_property
@@ -33,15 +34,20 @@ class EzSource:
 
     @cached_property
     def name_from_rss(self):
-        return self.rss_data.feed.title
+        return self._from_rss_feed("title")
+    
+    @cached_property
+    def domain(self):
+        """Returns a pattern like `example.com`"""
+        return urlparse(self.url).hostname
 
     @cached_property
     def description(self):
-        return self.rss_data.feed.description
+        return self._from_rss_feed("description")
 
     @cached_property
     def language(self):
-        return self.rss_data.feed.language
+        return self._from_rss_feed("language")
 
     @cached_property
     def favicon_href(self):
@@ -81,7 +87,7 @@ class EzSource:
             if head.ok and "rss" in content_type:
                 result = url
                 break
-        assert result, f"Couldn't find a RSS URL for {self.url}"
+        # assert result, f"Couldn't find a RSS URL for {self.url}"
         # print("Source RSS URL", result)
         return result
 
@@ -95,12 +101,13 @@ class EzSource:
         >>> feedparser.parse(self.rss_feed_url)
         ```
         """
+        if not self.rss_feed_url : return None
         return feedparser.parse(self.rss_feed_url)
 
     @cached_property
     def rss_links(self) -> List[str]:
         """Returns the all URLs included in RSS data"""
-        return list({i.link for i in self.rss_data.entries})
+        return list({i.link for i in self.rss_data.get("entries" , [])})
 
     @cached_property
     def site_map_url(self):
@@ -115,7 +122,7 @@ class EzSource:
             if safe_head(url, raise_for_status=False).ok:
                 result = url
                 break
-        assert result, f"Couldn't find a Sitemap URL for {self.url}"
+        # assert result, f"Couldn't find a Sitemap URL for {self.url}"
         # print("Source Sitemap URL", result)
         return result
 
@@ -155,11 +162,20 @@ class EzSource:
             # "topics": [],
         }
         return obj
+    
+    def _from_rss_feed(self , feedparser_key : str):
+        if not self.rss_data : return None
+        feed = self.rss_data.get("feed")
+        if not feed : return None
+        return feed.get(feedparser_key)
 
     def get_rss_items(self, ez_soup_class, limit: int = None) -> list:
         """Returns the all `EzSoup` items(articles) provided in the RSS data"""
+        if not self.rss_data : return []
+        entries = self.rss_data.get("entries")
+        if not entries : return []
         result = []
-        resource = self.rss_data.entries[:limit] if limit else self.rss_data.entries
+        resource = entries[:limit] if limit else entries
         for item in resource:
             tags = [d.get("term") for d in item.get("tags", [])]
             soup = ez_soup_class(url=item.link, topics=tags, source=self)
@@ -167,6 +183,7 @@ class EzSource:
         return result
 
     def site_map_links(self, contain: Optional[list]):
+        if not self.site_map_url : return None
         hrefs, directed = get_site_map_links(self.site_map_url, contain=contain)
         if directed:
             return hrefs
