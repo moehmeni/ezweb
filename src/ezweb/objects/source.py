@@ -1,15 +1,17 @@
 from typing import List, Optional
 from urllib.parse import urlparse
-from bs4.element import Tag
 import feedparser
 from feedparser.util import FeedParserDict
 from cached_property import cached_property
 import re
 from concurrent.futures import ThreadPoolExecutor
+
+# https://stackoverflow.com/questions/28282797/feedparser-parse-ssl-certificate-verify-failed
 import ssl
 if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 #
+
 from ezweb.utils.http import (
     can_be_rss_link,
     get_site_map_links,
