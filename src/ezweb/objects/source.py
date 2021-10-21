@@ -89,7 +89,7 @@ class EzSource:
                 if response.ok and ct_ok:
                     return url
                 
-        result = _finder([path_to_url(p) for p in first_guess])
+        result = _finder([path_to_url(p , self.url) for p in first_guess])
         if not result:
             # find a rss like href in the page
             all_a_tags = self.helper.all("a")
