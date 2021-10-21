@@ -9,7 +9,7 @@ pip install ezweb
 ```python
 from ezweb import EzSoup
 
-url = "https://www.pcmag.com/opinions/windows-11-is-ultra-secure-dont-mess-it-up"
+url = "https://www.theverge.com/22731034/google-pixel-6-pro-price-specs-features-release-date-hands-on"
 
 page = EzSoup(url = url)
 
@@ -18,25 +18,25 @@ print(page.json_summary)
 Output :
 ```json
 {
-    "url": "https://www.pcmag.com/opinions/windows-11-is-ultra-secure-dont-mess-it-up",
+    "url": "https://www.theverge.com/22731034/google-pixel-6-pro-price-specs-features-release-date-hands-on",
     "source": {
-        "url": "https://www.pcmag.com",
-        "name": "PCMAG",
-        "image": "https://pcmag.com/images/android-chrome-192x192.png",
-        "sitemap_url": "https://www.pcmag.com/sitemap-index.xml",
-        "articles_count": 43098 // You can also get the all article URLs!
+        "url": "https://www.theverge.com",
+        "name": "The Verge",
+        "description": "The Verge was founded in 2011 in partnership with Vox Media, and covers the intersection of technology, science, art, and culture. Its mission is to offer in-depth reporting and long-form feature stories, breaking news coverage, product information, and community content in a unified and cohesive manner. The site is powered by Vox Media's Chorus platform, a modern media stack built for web-native news in the 21st century.",
+        "language": "en",
+        "image": "https://cdn.vox-cdn.com/uploads/chorus_asset/file/7395351/android-chrome-192x192.0.png",
+        "rss_feed_url": "https://theverge.com/rss/index.xml",
+        "sitemap_url": "https://www.theverge.com/sitemaps"
     },
-    "title": "Windows 11 Is Ultra SecureDon't Mess It Up",
-    "description": "You can’t run Windows 11 on a PC that lacks essential security hardware. That's a good thing. Less promising is the fact that you can disable these requirements. Don't do that!",
-    "date": "2021-10-18 00:00:00",
-    "main_image": "https://i.pcmag.com/imagery/articles/06Sjyzm7AIuyEF1z9NpXvST-5.1634158671.fit_lim.size_1200x630.jpg",
-    "main_content": "Asked why he robbed banks, the notorious Willie Sutton allegedly answered, “Because that’s where the ... [MORE]",
+    "title": "Pixel 6 and 6 Pro: a first look at Google’s shot at a premium Android phone",
+    "description": "Google has officially announced its new Pixel 6 and Pixel 6 Pro. The new models start at $599 and $899, respectively, and feature new designs, new cameras, and the first-ever Google custom processor. They are available to preorder starting October 19th and will be shipping on October 28th.",
+    "date": "2021-10-19 13:00:00-04:00",
+    "main_image": "https://cdn.vox-cdn.com/thumbor/5f5xEVqSF0S3aTCRnoByipEng_4=/0x53:2040x1121/fit-in/1200x630/cdn.vox-cdn.com/uploads/chorus_asset/file/22934833/bfarsace_211014_4802_0013.jpg",
+    "main_content": "After many leaks, official teases, and months of waiting, Google has finally given its latest Pixel  ... [MORE]",
     "possible_topics": [
-        "Opinions",
-        "Operating systems",
-        "Windows"
+        "Google"
     ],
-    "comments": ""
+    "comments": "Loading comments..."
 }
 ```
 ## Documentation
