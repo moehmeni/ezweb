@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 # https://stackoverflow.com/questions/28282797/feedparser-parse-ssl-certificate-verify-failed
 import ssl
-if hasattr(ssl, '_create_unverified_context'):
+
+if hasattr(ssl, "_create_unverified_context"):
     ssl._create_default_https_context = ssl._create_unverified_context
 #
 
@@ -25,7 +26,6 @@ from ezweb.utils.http import (
 from ezweb.utils.souphelper import EzSoupHelper
 
 
-    
 class EzSource:
     def __init__(self, url: str):
         self.url = "https://" + url_host(url)
@@ -93,8 +93,8 @@ class EzSource:
                 ct_ok = "xml" in ct or "rss" in ct
                 if response.ok and ct_ok:
                     return url
-                
-        result = _finder([path_to_url(p , self.url) for p in first_guess])
+
+        result = _finder([path_to_url(p, self.url) for p in first_guess])
         if not result:
             # find a rss like href in the page
             all_a_tags = self.helper.all("a")
@@ -185,7 +185,9 @@ class EzSource:
             return None
         return feed.get(feedparser_key)
 
-    def get_rss_items(self, ez_soup_class, limit: int = None) -> list:
+    def get_rss_items(
+        self, ez_soup_class, multithread: bool = True, limit: int = None
+    ) -> list:
         """Returns the all `EzSoup` items(articles) provided in the RSS data"""
         if not self.rss_data:
             return []
@@ -194,10 +196,18 @@ class EzSource:
             return []
         result = []
         resource = entries[:limit] if limit else entries
-        for item in resource:
+
+        def _do(item):
             tags = [d.get("term") for d in item.get("tags", [])]
             soup = ez_soup_class(url=item.link, topics=tags, source=self)
             result.append(soup)
+
+        if multithread:
+            with ThreadPoolExecutor() as e:
+                e.map(_do, resource)
+        else:
+            for item in resource:
+                _do(item)
         return result
 
     def site_map_links(self, contain: Optional[list]):
