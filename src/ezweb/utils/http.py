@@ -111,12 +111,19 @@ def path_to_url(path: str , url : str):
     return url
 
 def can_be_rss_link(a) -> bool:
-    href = a.get("href")
+    href = a.get("href" , "").lower()
+    text = (a.text or "").lower()
+    title = a.get("title" , "").lower()
     if not href:
         return
+    if a.name == "link":
+        if "rss" in a.get("type" , "") :
+            return True
     if "rss" in href:
         return True
-    if "rss" in (a.text or ""):
+    if "rss" in text:
+        return True
+    if "rss" in title:
         return True
     return False
 

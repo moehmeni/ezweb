@@ -82,29 +82,34 @@ class EzSource:
         return l(biggest_icon_link_tag)
 
     @cached_property
-    def rss_feed_url(self):
+    def rss_feed_url_raw_data(self):
         """Returns the possible RSS URL of the source"""
-        first_guess = ["rss", "feed", "feeds"]
-
-        def _finder(possibilities: List[str]):
-            for url in possibilities:
-                response = safe_get(url, raise_for_status=False)
-                ct = response.headers.get("content-type", [])
-                ct_ok = "xml" in ct or "rss" in ct
-                if response.ok and ct_ok:
-                    return url
-
-        result = _finder([path_to_url(p, self.url) for p in first_guess])
+        
+        # first try to find a RSS-like href in the page
+        all_a_tags = self.helper.all(["a" , "link"])
+        guess = [
+            self.helper.absolute_href_of(a)
+            for a in all_a_tags
+            if can_be_rss_link(a)
+        ]
+        result = self._rss_link_finder(guess)
+        
+        # if there wasn't , check these paths
         if not result:
-            # find a rss like href in the page
-            all_a_tags = self.helper.all("a")
-            other_guess = [
-                self.helper.absolute_href_of(a)
-                for a in all_a_tags
-                if can_be_rss_link(a)
-            ]
-            result = _finder(other_guess)
-        return result
+            print("RSS URL not found in the page")
+            other_guess = ["rss", "feed", "feeds"]
+            other_guess = [path_to_url(p, self.url) for p in other_guess]
+            result = self._rss_link_finder(other_guess)
+            
+        return result or (None , None)
+    
+    @cached_property
+    def rss_feed_url(self):
+        return self.rss_feed_url_raw_data[0]
+    
+    @cached_property
+    def rss_feed_raw_data(self):
+        return self.rss_feed_url_raw_data[1]
 
     @cached_property
     def rss_data(self) -> FeedParserDict:
@@ -113,12 +118,12 @@ class EzSource:
         return type is : `FeedParserDict`
 
         ```
-        >>> feedparser.parse(self.rss_feed_url)
+        >>> feedparser.parse(self.rss_feed_raw_data)
         ```
         """
-        if not self.rss_feed_url:
+        if not (self.rss_feed_url and self.rss_feed_raw_data):
             return None
-        return feedparser.parse(self.rss_feed_url)
+        return feedparser.parse(self.rss_feed_raw_data)
 
     @cached_property
     def rss_links(self) -> List[str]:
@@ -214,6 +219,14 @@ class EzSource:
             for item in resource:
                 _do(item)
         return result
+    
+    def _rss_link_finder(self , possibilities: List[str]):
+        for url in possibilities:
+            response = safe_get(url, raise_for_status=False)
+            ct = response.headers.get("content-type", [])
+            ct_ok = "xml" in ct or "rss" in ct
+            if response.ok and ct_ok:
+                return url , response.text
 
     def site_map_links(self, contain: Optional[list]):
         if not self.site_map_url:
