@@ -186,12 +186,17 @@ class EzSource:
         return feed.get(feedparser_key)
 
     def get_rss_items(
-        self, ez_soup_class, multithread: bool = True, limit: int = None
+        self,
+        ez_soup_class,
+        rss_url: str = None,
+        multithread: bool = True,
+        limit: int = None,
     ) -> list:
         """Returns the all `EzSoup` items(articles) provided in the RSS data"""
-        if not self.rss_data:
+        data = feedparser.parse(rss_url) if rss_url else self.rss_data
+        if not data:
             return []
-        entries = self.rss_data.get("entries")
+        entries = data.get("entries")
         if not entries:
             return []
         result = []
