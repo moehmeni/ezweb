@@ -1,11 +1,17 @@
 # EzWeb
  An easy to use web page analyzer (scraper or crawler) with many useful features and properties
- 
+
+## Quick Access
+- [Notes](#notes)
+- [Installation](#installation)
+- [Basic example](#basic-example)
+- [EzProduct](#ezproduct)
+
 ## Installation
 ```
 pip install ezweb
 ```
-## Basic Usage
+## Basic Example
 ```python
 from ezweb import EzSoup
 
@@ -39,5 +45,64 @@ Output :
     "comments": "Loading comments..."
 }
 ```
-## Documentation
-Soon...
+
+## EzProduct
+```python
+from ezweb import EzProduct
+
+url = "https://www.razer.com/gaming-laptops/Razer-Blade-15/RZ09-0409JED3-R3U1"
+
+page = EzProduct(url)
+
+print(page.json_summary)
+```
+Output:
+```json
+{
+    "provider": {
+        "name": "Razer",
+        "domain": "razer.com",
+        "addresses": null,
+        "phone": []
+    },
+    "url": "https://www.razer.com/gaming-laptops/Razer-Blade-15/RZ09-0409JED3-R3U1",
+    "id_sku_or_mpn": null,
+    "title": "Blade 15 Advanced Model QHD 240Hz GeForce RTX 3070 Black",
+    "second_title": null,
+    "is_available": true,
+    "low_price": 2699.99,
+    "high_price": 2699.99,
+    "has_discount": true,
+    "discount_percentage": 0,
+    "price": {
+        "number": 2699.99,
+        "unit": "USD",
+        "number_humanize": "2,700",
+        "humanize": "2,700 USD"
+    },
+    "brand": "Razer",
+    "images": [
+        "https://assets3.razerzone.com/BXmAEATSJMaLlom3EfL6iwV0QuU=/1500x1000/https%3A%2F%2Fhybrismediaprod.blob.core.windows.net%2Fsys-master-phoenix-images-container%2Fha6%2Fh11%2F9208511594526%2F500x500-blade15-may2021-fhd.png"
+    ],
+    "specs": [
+        {
+            "Processor": "11th Gen Intel® Core™ i7-11800H 8 Cores (2.3GHz / 4.6GHz)"
+        },
+        {
+            "OS": "Windows 11 Home"
+        },
+        {
+            "Display": "15.6\" QHD 240Hz, 100% DCI-P3, G-Sync, 2.5ms, individually factory calibrated"
+        },
+        {
+            "Graphics": "Discrete: NVIDIA® GeForce RTX™3070 (8GB GDDR6 VRAM)Integrated: Intel® UHD Graphics"
+        },
+        // And more...
+    ],
+    "possible_topics": []
+}
+```
+
+## Notes
+- `EzSoup` and especially `EzProduct` results are more accurate for the Persian websites
+- I did not spent much time for documenting the code, so the package structure might looks confusing
