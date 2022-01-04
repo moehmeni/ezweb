@@ -1,3 +1,4 @@
+import json
 import re
 from typing import List, Union
 from bs4.element import Tag
@@ -44,7 +45,7 @@ class EzProduct(EzSoup):
             p += 0.6
         if self.second_title:
             p += 0.35
-        if "Product" in self.helper.from_structured_data("@type" , multiple=True):
+        if "Product" in self.helper.from_structured_data("@type", multiple=True):
             p += 0.75
         if p > max_p:
             p = max_p
@@ -318,7 +319,7 @@ class EzProduct(EzSoup):
                     continue
                 imgs.extend(el.find_all("img"))
             images.extend(
-                self.helper.from_structured_data("image" , multiple=True)
+                self.helper.from_structured_data("image", multiple=True)
                 or imgs
                 or self.card.find_all("img")
             )
@@ -452,13 +453,13 @@ class EzProduct(EzSoup):
         for key, value in matched:
             key = key.replace("-", "").strip()
             value = value.strip()
-            if len(key) > 35:  # a long key isn't a good specification
-                break
+            if len(key) > 35:  # a long key isn't suitable
+                continue
             if key == value:
-                break
+                continue
             d = {key: value}
             if not d:
-                break
+                continue
             result.append(d)
 
         return result
