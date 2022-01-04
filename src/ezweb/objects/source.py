@@ -47,7 +47,10 @@ class EzSource:
     @cached_property
     def domain(self):
         """Returns a pattern like `example.com`"""
-        return urlparse(self.url).hostname
+        hostname = urlparse(self.url).hostname
+        if "www." in hostname :
+            hostname = hostname.split("www.")[1]
+        return hostname
 
     @cached_property
     def description(self):
