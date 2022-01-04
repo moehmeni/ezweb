@@ -264,9 +264,8 @@ class EzProduct(EzSoup):
     @cached_property
     def provider_info(self):
         return {
-            "name": self.site_name,
-            "domain_root": self.root_domain,
-            "domain_body": self.site_name_from_host,
+            "name": self.source.name,
+            "domain": self.source.domain,
             "addresses": self.addresses,
             "phone": self.phones,
         }
@@ -390,7 +389,7 @@ class EzProduct(EzSoup):
         return self.specs_from_text + self.helper.table_info
 
     @cached_property
-    def summary_obj(self):
+    def summary_dict(self):
         obj = {
             "provider": self.provider_info,
             "url": self.url,
@@ -406,12 +405,13 @@ class EzProduct(EzSoup):
             "brand": self.brand,
             "images": self.images_src,
             "specs": self.specs,
-            "possible_topics": self.possible_topic_names,
-            # "links" : self.a_tag_hrefs_internal
-            "card": self._tag_obj(self.card),
-            # "main_text" : main_text ,
+            "possible_topics": self.helper.possible_topic_names,
         }
         return obj
+
+    @cached_property
+    def json_summary(self):
+        return json.dumps(self.summary_dict, indent=4, ensure_ascii=False)
 
     def _ok_images(self, images: List[Tag]):
         def _ok(i: Tag):
