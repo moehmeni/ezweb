@@ -105,4 +105,4 @@ Output:
 
 ## Notes
 - `EzSoup` and especially `EzProduct` results are more accurate for Persian websites
-- I did not spend much time documenting the code so the package structure might look confusing
+- Since I did not spend much time documenting the code, the package structure might look confusing
