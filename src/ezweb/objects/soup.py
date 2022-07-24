@@ -203,14 +203,17 @@ class EzSoup:
 
     @cached_property
     def article_tag_images(self):
+        if not self.article_tag:
+            return []
+
         def _img_criterion(img: Tag):
-            sim = similarity_of(page_title, img.get("alt", "").strip())
+            sim = similarity_of(self.title, img.get("alt", "").strip())
             return sim
 
         images = self.article_tag.find_all("img", {"src": True, "alt": True})
         if not images:
             return []
-        page_title = self.title
+
         # the first image alt has the most similarity with title
         images = sorted(images, key=lambda x: _img_criterion(x), reverse=True)
         return images

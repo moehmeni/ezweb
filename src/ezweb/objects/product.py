@@ -5,6 +5,7 @@ from bs4.element import Tag
 from trafilatura import extract
 from unidecode import unidecode
 from cached_property import cached_property
+
 #
 from ezweb.objects import EzSoup
 from ezweb.utils.http import soup_from_url
@@ -96,7 +97,9 @@ class EzProduct(EzSoup):
     @cached_property
     def is_available(self):
         """Returns whether this product is in-stock or not"""
-        return True if "instock" in str(self.availablity.lower()) else False
+        if self.availablity and "instock" in str(self.availablity.lower()):
+            return True
+        return False
 
     @cached_property
     def brand(self):
@@ -157,7 +160,7 @@ class EzProduct(EzSoup):
         if not el:
             return None
 
-        result = clean_title(el.text, self.site_name)
+        result = clean_title(el.text, self.source.name)
         # check sim again since even the sorted list el can be a bad value
         sim = similarity_of(result, title)
         if sim > 95 or sim < 49:
@@ -284,7 +287,9 @@ class EzProduct(EzSoup):
 
         if not tags:
             # search in footer if 'phone' like class isn't in the DOM
-            tags = [self.helper.all("footer")[-1]]
+            footers = self.helper.all("footer")
+            if footers:
+                tags = [footers[-1]]
             if not tags:
                 return []
 
