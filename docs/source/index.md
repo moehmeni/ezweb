@@ -1,0 +1,2 @@
+EzWeb project is intended to be an easy to use tool to analyze web pages in order to extract important information.
+Today as AI is growing more than imaginations, we more than ever need faster tools to provide proper and clean data for the models.
