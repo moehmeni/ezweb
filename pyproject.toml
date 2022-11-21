@@ -38,4 +38,4 @@ cached-property = "^1.5.2"
 feedparser = "^6.0.10"
 
 [tool.poetry.dev-dependencies]
-lxml = { path = "lxml-4.9.0-cp311-cp311-win_amd64.whl" }
+lxml = { path = "wheels/lxml-4.9.0-cp311-cp311-win_amd64.whl" }
