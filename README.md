@@ -9,7 +9,7 @@
 
 ## Installation
 ```
-pip install ezweb
+pip install https://github.com/rtcq/ezweb/releases/download/v4.5.0/ezweb-4.5.0-py3-none-any.whl
 ```
 ## Basic Example
 ```python
